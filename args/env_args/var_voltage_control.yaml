@@ -1,0 +1,20 @@
+env: "voltage_control"
+
+env_args:
+    "reward_type": "l1" # "l1", "l2", "bowl", "liu"
+    "voltage_weight": 1.0
+    "q_weight": null
+    "line_weight": 0.01
+    "dq_dv_weight": null
+    "forecast_horizon": 2
+    "pv_scale": null
+    "demand_scale": null
+    "state_space": ["pv", "demand", "reactive", "vm_pu", "va_degree"]
+    "v_upper": 1.05
+    "v_lower": 0.95
+    "data_path": "./environments/var_voltage_control/data/bus33bw_gu"
+    "episode_limit": 100 # in time intervals
+    "action_scale": null
+    "action_bias": null
+    "mode": null # distributed / decentralised
+    "reset_action": True

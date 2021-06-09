@@ -1,0 +1,10 @@
+alg: "iddpg"
+
+alg_args:
+    "policy_lrate": 1.0e-4
+    "value_lrate": 1.0e-3
+    "replay_warmup": 0
+    "behaviour_update_freq": 25
+    "value_update_epochs": 10
+    "target_update_freq": 50
+    

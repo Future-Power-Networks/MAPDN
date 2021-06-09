@@ -1,0 +1,32 @@
+# if set batch_size=replay_buffer_size=update_freq and episodic=True -> on-policy episodic update
+# for on-policy algorithms, it will be automatically cleared replay buffer after each update
+# if set batch_size=replay_buffer_size=update_freq and episodic=False -> on-policy transition update
+# if set batch_size / update_freq <= replay_buffer_size and episodic=True -> off-policy episodic update
+# if set batch_size / update_freq <= replay_buffer_size and episodic=False -> off-policy transition update
+"gumbel_softmax": False
+"epsilon_softmax": False
+"episodic": False
+"cuda": True
+"grad_clip": True
+"grad_clip_eps": 1.0 # activated when grad_clip=True
+"save_model_freq": 20
+"target": True
+"target_lr": 0.1
+"entr": 1.0e-3
+"max_steps": 200
+"batch_size": 32 # transition update: steps / episodic update: episodes
+"replay": True
+"replay_buffer_size": 1.0e+4
+"gamma": 0.99
+"hid_size": 32
+"continuous": True
+"init_type": "normal"
+"init_std": 0.1
+"normalize_advantages": False
+"train_episodes_num": 400
+"behaviour_update_freq": 25 # transition update: steps / episodic update: episodes
+"policy_update_epochs": 1
+"value_update_epochs": 10
+"target_update_freq": 50 # transition update: steps / episodic update: episodes
+"reward_normalisation": True
+"eval_freq": 10 # evaluation per xxx episodes
