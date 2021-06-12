@@ -78,9 +78,9 @@ class COMA(Model):
 
         return values
 
-    def get_actions(self, state, status, exploration, actions_avail, target=False):
+    def get_actions(self, state, status, exploration, actions_avail, target=False, last_hid=None):
         if self.args.continuous:
-            means, log_stds, _ = self.policy(state) if not target else self.target_net.policy(state)
+            means, log_stds, hiddens = self.policy(state, last_hid=last_hid) if not target else self.target_net.policy(state, last_hid=last_hid)
             if means.size(-1) > 1:
                 means_ = means.sum(dim=1, keepdim=True)
                 log_stds_ = log_stds.sum(dim=1, keepdim=True)
@@ -92,21 +92,21 @@ class COMA(Model):
             restore_actions = restore_mask * actions
             action_out = (means, log_stds)
         else:
-            logits, _, _ = self.policy(state) if not target else self.target_net.policy(state)
+            logits, _, hiddens = self.policy(state, last_hid=last_hid) if not target else self.target_net.policy(state, last_hid=last_hid)
             logits[actions_avail == 0] = -9999999
             actions, log_prob_a = select_action(self.args, logits, status=status, exploration=exploration)
             restore_actions = actions
             action_out = logits
-        return actions, restore_actions, log_prob_a, action_out
+        return actions, restore_actions, log_prob_a, action_out, hiddens
 
     def get_loss(self, batch):
         batch_size = len(batch.state)
-        state, actions, old_log_prob_a, old_values, old_next_values, rewards, next_state, done, last_step, actions_avail = self.unpack_data(batch)
+        state, actions, old_log_prob_a, old_values, old_next_values, rewards, next_state, done, last_step, actions_avail, last_hids, hids = self.unpack_data(batch)
         if self.args.continuous:
-            means, log_stds, _ = self.policy(state)
+            means, log_stds, _ = self.policy(state, last_hid=last_hids)
             action_out = (means, log_stds)
             log_prob_a = normal_log_density(actions, means, log_stds)
-            _, next_actions, _, _ = self.get_actions(next_state, status='train', exploration=True, actions_avail=actions_avail, target=self.args.target)
+            _, next_actions, _, _, _ = self.get_actions(next_state, status='train', exploration=True, actions_avail=actions_avail, target=self.args.target, last_hid=hids)
             self.sample_size = self.args.sample_size
             means, log_stds = action_out
             means_repeat = means.unsqueeze(0).repeat(self.sample_size, 1, 1, 1) # (s,b,n,a)
@@ -123,10 +123,10 @@ class COMA(Model):
             baselines = torch.mean(values_sampled, dim=0) # (b,n)
             values = self.value(state, actions).squeeze(-1) # (b,n,a) -> (b,n) action value
         else:
-            logits, _ = self.policy(state)
+            logits, _ = self.policy(state, last_hid=last_hids)
             action_out = logits
             log_prob_a = multinomials_log_density(actions, logits)
-            _, next_actions, _, _ = self.get_actions(next_state, status='train', exploration=True, target=self.args.target)
+            _, next_actions, _, _, _ = self.get_actions(next_state, status='train', exploration=True, target=self.args.target, last_hid=hids)
             values = self.value(state, actions) # (b,n,a) action value
             baselines = torch.sum(values*torch.softmax(logits, dim=-1), dim=-1) # the only difference to ActorCritic is this  baseline (b,n)
             values = torch.sum(values*actions, dim=-1) # (b,n)

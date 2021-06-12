@@ -50,6 +50,7 @@ class MATD3(Model):
                 for j, a in enumerate(nm):
                     if j != i:
                         a = a.detach()
+                        
         act_reshape = act_repeat.contiguous().view( -1, np.prod(act.size()[1:]) ) # shape = (b*n, n*a)
         inputs = torch.cat( (obs_reshape, act_reshape), dim=-1 )
         ones = cuda_wrapper( torch.ones( inputs.size()[:-1] + (1,), dtype=torch.float ), self.cuda_)
@@ -64,9 +65,9 @@ class MATD3(Model):
 
         return torch.cat([values1, values2], dim=0)
 
-    def get_actions(self, state, status, exploration, actions_avail, target=False):
+    def get_actions(self, state, status, exploration, actions_avail, target=False, last_hid=None):
         if self.args.continuous:
-            means, log_stds, _ = self.policy(state) if not target else self.target_net.policy(state)
+            means, log_stds, hiddens = self.policy(state, last_hid=last_hid) if not target else self.target_net.policy(state, last_hid=last_hid)
             means[actions_avail == 0] = 0.0
             log_stds[actions_avail == 0] = 0.0
             if means.size(-1) > 1:
@@ -80,19 +81,19 @@ class MATD3(Model):
             restore_actions = restore_mask * actions
             action_out = (means, log_stds)
         else:
-            logits, _, _ = self.policy(state) if not target else self.target_net.policy(state)
+            logits, _, hiddens = self.policy(state, last_hid=last_hid) if not target else self.target_net.policy(state, last_hid=last_hid)
             logits[actions_avail == 0] = -9999999
             # this follows the original version of sac: sampling actions
             actions, log_prob_a = select_action(self.args, logits, status=status, exploration=exploration)
             restore_actions = actions
             action_out = logits
-        return actions, restore_actions, log_prob_a, action_out
+        return actions, restore_actions, log_prob_a, action_out, hiddens
 
     def get_loss(self, batch):
         batch_size = len(batch.state)
-        state, actions, old_log_prob_a, old_values, old_next_values, rewards, next_state, done, last_step, actions_avail = self.unpack_data(batch)
-        _, actions_pol, log_prob_a, action_out = self.get_actions(state, status='train', exploration=False, actions_avail=actions_avail, target=False)
-        _, next_actions, _, _ = self.get_actions(next_state, status='train', exploration=True, actions_avail=actions_avail, target=self.args.target)
+        state, actions, old_log_prob_a, old_values, old_next_values, rewards, next_state, done, last_step, actions_avail, last_hids, hids = self.unpack_data(batch)
+        _, actions_pol, log_prob_a, action_out, _ = self.get_actions(state, status='train', exploration=False, actions_avail=actions_avail, target=False, last_hid=last_hids)
+        _, next_actions, _, _, _ = self.get_actions(next_state, status='train', exploration=True, actions_avail=actions_avail, target=self.args.target, last_hid=hids)
         compose_pol = self.value(state, actions_pol)
         values_pol = compose_pol[:batch_size, :]
         values_pol = values_pol.contiguous().view(-1, self.n_)

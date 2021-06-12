@@ -3,7 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-
 class MLPCritic(nn.Module):
     def __init__(self, input_shape, output_shape, args):
         super(MLPCritic, self).__init__()
@@ -11,7 +10,7 @@ class MLPCritic(nn.Module):
 
         # Easiest to reuse hid_size variable
         self.fc1 = nn.Linear(input_shape, args.hid_size)
-        self.fc2 = nn.Linear(args.hid_size, args.hid_size)
+        self.fc2 = nn.Linear(args.hid_size, args.hid_size )
         self.fc3 = nn.Linear(args.hid_size, output_shape)
 
     def init_hidden(self):

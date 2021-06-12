@@ -18,7 +18,7 @@ class RNNAgent(nn.Module):
         return self.fc1.weight.new(1, self.args.agent_num, self.args.hid_size).zero_()
 
     def forward(self, inputs, hidden_state):
-        x = F.relu(self.fc1(inputs))
+        x = th.tanh(self.fc1(inputs))
         h_in = hidden_state.reshape(-1, self.args.hid_size)
         h = self.rnn(x, h_in)
         a = self.fc2(h)

@@ -5,7 +5,6 @@ from utilities.util import select_action, cuda_wrapper, batchnorm, multinomials_
 from models.model import Model
 from collections import namedtuple
 from critics.maac_critic import AttentionCritic
-from agents.mlp_agent_gaussian import MLPAgent
 
 
 class MAAC(Model):
@@ -19,8 +18,16 @@ class MAAC(Model):
 
     def construct_policy_net(self):
         # TODO: fix policy params update
-        self.policy_dicts = nn.ModuleList( [ MLPAgent(self.obs_dim + self.n_, self.args) ] )
+        # self.policy_dicts = nn.ModuleList( [ MLPAgent(self.obs_dim + self.n_, self.args) ] )
         # self.policy_dicts = nn.ModuleList( [ MLPAgent(self.obs_dim, self.args) ] )
+        if self.args.agent_type == 'mlp':
+            from agents.mlp_agent_gaussian import MLPAgent
+            self.policy_dicts = nn.ModuleList( [ MLPAgent(self.obs_dim + self.n_, self.args) ] )
+        elif self.args.agent_type == 'rnn':
+            from agents.rnn_agent_gaussian import RNNAgent
+            self.policy_dicts = nn.ModuleList( [ RNNAgent(self.obs_dim + self.n_, self.args) ] )
+        else:
+            NotImplementedError()
 
     def construct_value_net(self):
         self.value_dicts = nn.ModuleList( [ AttentionCritic(self.args) ] )
@@ -78,9 +85,9 @@ class MAAC(Model):
 
         return torch.cat(dec_agents_rets, dim=0)
 
-    def get_actions(self, state, status, exploration, actions_avail, target=False):
+    def get_actions(self, state, status, exploration, actions_avail, target=False, last_hid=None):
         if self.args.continuous:
-            means, log_stds, _ = self.policy(state) if not target else self.target_net.policy(state)
+            means, log_stds, hiddens = self.policy(state, last_hid=last_hid) if not target else self.target_net.policy(state, last_hid=last_hid)
             if means.size(-1) > 1:
                 means_ = means.sum(dim=1, keepdim=True)
                 log_stds_ = log_stds.sum(dim=1, keepdim=True)
@@ -95,19 +102,19 @@ class MAAC(Model):
             restore_actions = restore_mask * actions
             action_out = (means, log_stds)
         else:
-            logits, _, _ = self.policy(state) if not target else self.target_net.policy(state)
+            logits, _, hiddens = self.policy(state, last_hid=last_hid) if not target else self.target_net.policy(state, last_hid=last_hid)
             logits[actions_avail == 0] = -9999999
             # this follows the original version of sac: sampling actions
             actions, log_prob_a = select_action(self.args, logits, status=status, exploration=exploration)
             restore_actions = actions
             action_out = logits
-        return actions, restore_actions, log_prob_a, action_out
+        return actions, restore_actions, log_prob_a, action_out, hiddens
 
     def get_loss(self, batch):
         batch_size = len(batch.state)
-        state, actions, old_log_prob_a, old_values, old_next_values, rewards, next_state, done, last_step, actions_avail = self.unpack_data(batch)
-        _, actions_pol, log_prob_a, action_out = self.get_actions(state, status='train', exploration=True, actions_avail=actions_avail, target=False)
-        _, next_actions, _, _ = self.get_actions(next_state, status='train', exploration=True, actions_avail=actions_avail, target=self.args.target)
+        state, actions, old_log_prob_a, old_values, old_next_values, rewards, next_state, done, last_step, actions_avail, last_hids, hids = self.unpack_data(batch)
+        _, actions_pol, log_prob_a, action_out, _ = self.get_actions(state, status='train', exploration=True, actions_avail=actions_avail, target=False, last_hid=last_hids)
+        _, next_actions, _, _, _ = self.get_actions(next_state, status='train', exploration=True, actions_avail=actions_avail, target=self.args.target, last_hid=hids)
         values_pol = self.value(state, actions_pol)[:batch_size, :]
         compose = self.value(state, actions.detach()) # values = (b. n) / attn_reg = (1, n)
         values, attn_reg = compose[:batch_size, :], compose[batch_size:batch_size+1, :]

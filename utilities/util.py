@@ -34,11 +34,13 @@ class GumbelSoftmax(OneHotCategorical):
         return self.hard_gumbel_softmax_sample()
 
 def normal_entropy(mean, std):
-    return Normal(mean, std).entropy().sum()
+    # return Normal(mean, std).entropy().sum()
+    return Normal(mean, std).entropy().mean()
 
 def multinomial_entropy(logits):
     assert logits.size(-1) > 1
-    return GumbelSoftmax(logits=logits).entropy().sum()
+    # return GumbelSoftmax(logits=logits).entropy().sum()
+    return GumbelSoftmax(logits=logits).entropy().mean()
 
 def normal_log_density(actions, means, log_stds):
     stds = log_stds.exp()

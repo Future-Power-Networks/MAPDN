@@ -14,9 +14,9 @@ class DDPG(ReinforcementLearning):
     def get_loss(self, batch, behaviour_net, target_net):
         batch_size = len(batch.state)
         n = self.args.agent_num
-        state, actions, old_log_prob_a, old_values, old_next_values, rewards, next_state, done, last_step, actions_avail = behaviour_net.unpack_data(batch)
-        _, actions_pol, log_prob_a, action_out = behaviour_net.get_actions(state, status='train', exploration=False, actions_avail=actions_avail, target=False)
-        _, next_actions, _, _ = behaviour_net.get_actions(next_state, status='train', exploration=False, actions_avail=actions_avail, target=self.args.target)
+        state, actions, old_log_prob_a, old_values, old_next_values, rewards, next_state, done, last_step, actions_avail, last_hids, hids = behaviour_net.unpack_data(batch)
+        _, actions_pol, log_prob_a, action_out, _ = behaviour_net.get_actions(state, status='train', exploration=False, actions_avail=actions_avail, target=False, last_hid=last_hids)
+        _, next_actions, _, _, _ = behaviour_net.get_actions(next_state, status='train', exploration=False, actions_avail=actions_avail, target=self.args.target, last_hid=hids)
         values_pol = behaviour_net.value(state, actions_pol).contiguous().view(-1, n)
         values = behaviour_net.value(state, actions).contiguous().view(-1, n)
         next_values = target_net.value(next_state, next_actions.detach()).contiguous().view(-1, n)

@@ -78,7 +78,7 @@ with open("./args/default.yaml", "r") as f:
     default_config_dict = yaml.safe_load(f)
 
 # load alg args
-with open("./args/alg_args/"+argv.alg+".yaml", "r") as f:
+with open("./args/alg_args/" + argv.alg + ".yaml", "r") as f:
     alg_config_dict = yaml.safe_load(f)["alg_args"]
     if "action_scale" in alg_config_dict.keys():
         alg_config_dict["action_scale"] = env_config_dict["action_scale"]
@@ -105,22 +105,22 @@ else:
 
 # create the save folders
 if "model_save" not in os.listdir(save_path):
-    os.mkdir(save_path+"model_save")
+    os.mkdir(save_path + "model_save")
 if "tensorboard" not in os.listdir(save_path):
-    os.mkdir(save_path+"tensorboard")
-if log_name not in os.listdir(save_path+"model_save/"):
-    os.mkdir(save_path+"model_save/"+log_name)
-if log_name not in os.listdir(save_path+"tensorboard/"):
-    os.mkdir(save_path+"tensorboard/"+log_name)
+    os.mkdir(save_path + "tensorboard")
+if log_name not in os.listdir(save_path + "model_save/"):
+    os.mkdir(save_path + "model_save/" + log_name)
+if log_name not in os.listdir(save_path + "tensorboard/"):
+    os.mkdir(save_path + "tensorboard/" + log_name)
 else:
-    path = save_path+"tensorboard/"+log_name
+    path = save_path + "tensorboard/" + log_name
     for f in os.listdir(path):
         file_path = os.path.join(path,f)
         if os.path.isfile(file_path):
             os.remove(file_path)
 
 # create the logger
-logger = SummaryWriter(save_path+"tensorboard/"+log_name)
+logger = SummaryWriter(save_path + "tensorboard/" + log_name)
 
 model = Model[argv.alg]
 
@@ -135,9 +135,9 @@ elif strategy == "q":
 else:
     raise RuntimeError("Please input the correct strategy, e.g. pg or q.")
 
-with open(save_path+"tensorboard/"+log_name+"/log.txt", "w+") as file:
-    file.write(str(args)+"\n")
-    file.write(str(env_config_dict)+"\n")
+with open(save_path + "tensorboard/" + log_name + "/log.txt", "w+") as file:
+    file.write(str(args) + "\n")
+    file.write(str(env_config_dict) + "\n")
 
 for i in range(args.train_episodes_num):
     stat = {}
@@ -145,7 +145,7 @@ for i in range(args.train_episodes_num):
     train.logging(stat)
     if i%args.save_model_freq == args.save_model_freq-1:
         train.print_info(stat)
-        torch.save({"model_state_dict": train.behaviour_net.state_dict()}, save_path+"model_save/"+log_name+"/model.pt")
+        torch.save({"model_state_dict": train.behaviour_net.state_dict()}, save_path + "model_save/" + log_name + "/model.pt")
         print ("The model is saved!\n")
 
 logger.close()

@@ -6,7 +6,6 @@ from models.model import Model
 from learning_algorithms.ppo import PPO
 from collections import namedtuple
 from critics.mlp_critic_ppo import MLPCritic
-from agents.mlp_agent_ppo import MLPAgent
 
 
 class IPPO(Model):
@@ -26,8 +25,16 @@ class IPPO(Model):
         self.value_dicts = nn.ModuleList( [ MLPCritic(input_shape, output_shape, self.args) ] )
 
     def construct_policy_net(self):
-        self.policy_dicts = nn.ModuleList([ MLPAgent(self.obs_dim+self.n_, self.args) ])
+        # self.policy_dicts = nn.ModuleList([ MLPAgent(self.obs_dim+self.n_, self.args) ])
         # self.policy_dicts = nn.ModuleList([ MLPAgent(self.obs_dim, self.args) ])
+        if self.args.agent_type == 'mlp':
+            from agents.mlp_agent_ppo import MLPAgent
+            self.policy_dicts = nn.ModuleList([ MLPAgent(self.obs_dim+self.n_, self.args) ])
+        elif self.args.agent_type == 'rnn':
+            from agents.rnn_agent_ppo import RNNAgent
+            self.policy_dicts = nn.ModuleList([ RNNAgent(self.obs_dim+self.n_, self.args) ])
+        else:
+            NotImplementedError()
         
     def construct_model(self):
         self.construct_value_net()
@@ -52,9 +59,9 @@ class IPPO(Model):
 
         return values
 
-    def get_actions(self, state, status, exploration, actions_avail, target=False):
+    def get_actions(self, state, status, exploration, actions_avail, target=False, last_hid=None):
         if self.args.continuous:
-            means, log_stds, _ = self.policy(state) if not target else self.target_net.policy(state)
+            means, log_stds, hiddens = self.policy(state, last_hid=last_hid) if not target else self.target_net.policy(state, last_hid=last_hid)
             if means.size(-1) > 1:
                 means_ = means.sum(dim=1, keepdim=True)
                 log_stds_ = log_stds.sum(dim=1, keepdim=True)
@@ -66,12 +73,12 @@ class IPPO(Model):
             restore_actions = restore_mask * actions
             action_out = (means, log_stds)
         else:
-            logits, _, _ = self.policy(state) if not target else self.target_net.policy(state)
+            logits, _, hiddens = self.policy(state, last_hid=last_hid) if not target else self.target_net.policy(state, last_hid=last_hid)
             logits[actions_avail == 0] = -9999999
             actions, log_prob_a = select_action(self.args, logits, status=status, exploration=exploration)
             restore_actions = actions
             action_out = logits
-        return actions, restore_actions, log_prob_a, action_out
+        return actions, restore_actions, log_prob_a, action_out, hiddens
 
     def get_loss(self, batch):
         policy_loss, value_loss, action_out = self.rl.get_loss(batch, self, self.target_net)

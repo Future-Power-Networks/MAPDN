@@ -40,10 +40,20 @@ class SQDDPG(Model):
     def marginal_contribution(self, obs, act):
         batch_size = obs.size(0)
         subcoalition_map, grand_coalitions = self.sample_grandcoalitions(batch_size) # shape = (b, n_s, n, n)
-        grand_coalitions = grand_coalitions.unsqueeze(-1).expand(batch_size, self.sample_size, self.n_, self.n_, self.act_dim) # shape = (b, n_s, n, n, a)
-        act = act.unsqueeze(1).unsqueeze(2).expand(batch_size, self.sample_size, self.n_, self.n_, self.act_dim).gather(3, grand_coalitions) # shape = (b, n, a) -> (b, 1, 1, n, a) -> (b, n_s, n, n, a)
+        grand_coalitions_expand = grand_coalitions.unsqueeze(-1).expand(batch_size, self.sample_size, self.n_, self.n_, self.act_dim) # shape = (b, n_s, n, n, a)
+        act = act.unsqueeze(1).unsqueeze(2).expand(batch_size, self.sample_size, self.n_, self.n_, self.act_dim).gather(3, grand_coalitions_expand) # shape = (b, n, a) -> (b, 1, 1, n, a) -> (b, n_s, n, n, a)
         act_map = subcoalition_map.unsqueeze(-1).float() # shape = (b, n_s, n, n, 1)
-        act = act * act_map
+        act = act * act_map # shape = (b, n_s, n, n, a)
+
+        # detach the gradient of other agents
+        # act = act.contiguous().view(batch_size*self.sample_size, self.n_, self.n_, -1) # shape = (b*n_s, n, n, a)
+        # grand_coalitions = grand_coalitions.contiguous().view(batch_size*self.sample_size, self.n_, self.n_) # shape = (b*n_s, n, n)
+        # for i, ba in enumerate(act):
+        #     for j, nna in enumerate(ba):
+        #         for k, na in enumerate(nna):
+        #             if grand_coalitions[i, j, j] != k:
+        #                 na = na.detach()
+
         act = act.contiguous().view(batch_size, self.sample_size, self.n_, -1) # shape = (b, n_s, n, n*a)
         obs = obs.unsqueeze(1).unsqueeze(2).expand(batch_size, self.sample_size, self.n_, self.n_, self.obs_dim) # shape = (b, n, o) -> (b, 1, n, o) -> (b, 1, 1, n, o) -> (b, n_s, n, n, o)
         obs = obs.contiguous().view(batch_size, self.sample_size, self.n_, self.n_*self.obs_dim) # shape = (b, n_s, n, n, o) -> (b, n_s, n, n*o)
@@ -54,10 +64,10 @@ class SQDDPG(Model):
         # add agent id
         agent_ids = torch.eye(self.n_).unsqueeze(0).repeat(batch_size*self.sample_size, 1, 1) # shape = (b*n_s, n, n)
         agent_ids = cuda_wrapper(agent_ids, self.cuda_)
-        inp = torch.cat( (inp, agent_ids), dim=-1 ) # shape = (b, n, n*o+n)
+        inp = torch.cat( (inp, agent_ids), dim=-1 ) # shape = (b*n_s, n, n*o+n*a+n)
 
         # inputs = inp.contiguous().view( -1, self.n_ * (self.obs_dim + self.act_dim + 1) ) # shape = (-1, n*o+n*a+n)
-        inputs = inp.contiguous().view( batch_size*self.sample_size*self.n_, -1 ) # shape = (b*n_s*n, n*o+n*a)
+        inputs = inp.contiguous().view( batch_size*self.sample_size*self.n_, -1 ) # shape = (b*n_s*n, n*o+n*a+n)
         agent_value = self.value_dicts[0]
         values, _ = agent_value(inputs, None)
         values = values.contiguous().view(batch_size, self.sample_size, self.n_, 1) # shape = (b, n_s, n, 1)
@@ -67,9 +77,9 @@ class SQDDPG(Model):
     def value(self, obs, act):
         return self.marginal_contribution(obs, act)
         
-    def get_actions(self, state, status, exploration, actions_avail, target=False):
+    def get_actions(self, state, status, exploration, actions_avail, target=False, last_hid=None):
         if self.args.continuous:
-            means, log_stds, _ = self.policy(state) if not target else self.target_net.policy(state)
+            means, log_stds, hiddens = self.policy(state, last_hid=last_hid) if not target else self.target_net.policy(state, last_hid=last_hid)
             if means.size(-1) > 1:
                 means_ = means.sum(dim=1, keepdim=True)
                 log_stds_ = log_stds.sum(dim=1, keepdim=True)
@@ -81,18 +91,18 @@ class SQDDPG(Model):
             restore_actions = restore_mask * actions
             action_out = (means, log_stds)
         else:
-            logits, _, _ = self.policy(state) if not target else self.target_net.policy(state)
+            logits, _, hiddens = self.policy(state, last_hid=last_hid) if not target else self.target_net.policy(state, last_hid=last_hid)
             logits[actions_avail == 0] = -9999999
             actions, log_prob_a = select_action(self.args, logits, status=status, exploration=exploration)
             restore_actions = actions
             action_out = logits
-        return actions, restore_actions, log_prob_a, action_out
+        return actions, restore_actions, log_prob_a, action_out, hiddens
 
     def get_loss(self, batch):
         batch_size = len(batch.state)
-        state, actions, old_log_prob_a, old_values, old_next_values, rewards, next_state, done, last_step, actions_avail = self.unpack_data(batch)
-        _, actions_pol, log_prob_a, action_out = self.get_actions(state, status='train', exploration=False, actions_avail=actions_avail, target=False)
-        _, next_actions, _, _ = self.get_actions(next_state, status='train', exploration=False, actions_avail=actions_avail, target=self.args.target)
+        state, actions, old_log_prob_a, old_values, old_next_values, rewards, next_state, done, last_step, actions_avail, last_hids, hids = self.unpack_data(batch)
+        _, actions_pol, log_prob_a, action_out, _ = self.get_actions(state, status='train', exploration=False, actions_avail=actions_avail, target=False, last_hid=last_hids)
+        _, next_actions, _, _, _ = self.get_actions(next_state, status='train', exploration=False, actions_avail=actions_avail, target=self.args.target, last_hid=hids)
         shapley_values_pol = self.marginal_contribution(state, actions_pol).mean(dim=1).contiguous().view(-1, self.n_)
         # do the exploration action on the value loss
         shapley_values_sum = self.marginal_contribution(state, actions).mean(dim=1).contiguous().view(-1, self.n_).sum(dim=-1, keepdim=True).expand(batch_size, self.n_)

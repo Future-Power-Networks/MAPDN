@@ -65,7 +65,7 @@ elif argv.difficulty == "super_hard":
         env_config_dict["action_scale"] = 0.5
     elif argv.scenario == 'bus141_gu':
         env_config_dict["action_bias"] = 0.0
-        env_config_dict["action_scale"] = 0.8
+        env_config_dict["action_scale"] = 0.6
     elif argv.scenario == 'bus347_gu':
         env_config_dict["action_bias"] = 0.0
         env_config_dict["action_scale"] = 0.3
@@ -130,8 +130,8 @@ else:
     raise RuntimeError("Please input the correct strategy, e.g. pg or q.")
 
 if argv.test_mode == 'single':
-    # record = test.run(199, 23, 2) # (day, hour, quarter)
-    record = test.run(730, 23, 2) # (day, hour, quarter)
+    record = test.run(199, 23, 2) # (day, hour, quarter)
+    # record = test.run(730, 23, 2) # (day, hour, quarter)
 elif argv.test_mode == 'batch':
     record = test.batch_run(10)
 

@@ -1,12 +1,12 @@
 env: "voltage_control"
 
 env_args:
-    "reward_type": "l1" # "l1", "l2", "bowl", "liu"
+    "reward_type": "l1" # "l1", "l2", "bowl", "liu", "bump"
     "voltage_weight": 1.0
     "q_weight": null
     "line_weight": 0.01
     "dq_dv_weight": null
-    "forecast_horizon": 2
+    "forecast_horizon": 1
     "pv_scale": null
     "demand_scale": null
     "state_space": ["pv", "demand", "reactive", "vm_pu", "va_degree"]

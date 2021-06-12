@@ -13,18 +13,18 @@ class ActorCritic(ReinforcementLearning):
     def get_loss(self, batch, behaviour_net, target_net=None):
         batch_size = len(batch.state)
         n = self.args.agent_num
-        state, actions, old_log_prob_a, old_values, old_next_values, rewards, next_state, done, last_step, actions_avail = behaviour_net.unpack_data(batch)
+        state, actions, old_log_prob_a, old_values, old_next_values, rewards, next_state, done, last_step, actions_avail, last_hids, hids = behaviour_net.unpack_data(batch)
         if self.args.continuous:
-            means, log_stds, _ = behaviour_net.policy(state)
+            means, log_stds, _ = behaviour_net.policy(state, last_hid=last_hids)
             action_out = (means, log_stds)
             log_prob_a = normal_log_density(actions, means, log_stds)
             restore_mask = 1. - cuda_wrapper((actions_avail == 0).float(), self.cuda_)
             log_prob_a = (restore_mask * log_prob_a).sum(dim=-1)
         else:
-            logits, _ = behaviour_net.policy(state)
+            logits, _ = behaviour_net.policy(state, last_hid=last_hids)
             action_out = logits
             log_prob_a = multinomials_log_density(actions, logits)
-        _, next_actions, _, _ = behaviour_net.get_actions(next_state, status='train', exploration=True, actions_avail=actions_avail, target=self.args.target)
+        _, next_actions, _, _, _ = behaviour_net.get_actions(next_state, status='train', exploration=True, actions_avail=actions_avail, target=self.args.target, last_hid=hids)
         # values_pol = behaviour_net.value(state, actions)
         values = behaviour_net.value(state, actions)
         if not self.args.continuous:

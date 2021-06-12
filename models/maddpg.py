@@ -6,7 +6,7 @@ from models.model import Model
 from learning_algorithms.ddpg import DDPG
 from collections import namedtuple
 from critics.mlp_critic import MLPCritic
-from agents.mlp_agent import MLPAgent
+# from agents.mlp_agent import MLPAgent
 
 
 class MADDPG(Model):
@@ -56,9 +56,9 @@ class MADDPG(Model):
 
         return values
 
-    def get_actions(self, state, status, exploration, actions_avail, target=False):
+    def get_actions(self, state, status, exploration, actions_avail, target=False, last_hid=None):
         if self.args.continuous:
-            means, log_stds, _ = self.policy(state) if not target else self.target_net.policy(state)
+            means, log_stds, hiddens = self.policy(state, last_hid=last_hid) if not target else self.target_net.policy(state, last_hid=last_hid)
             if means.size(-1) > 1:
                 means_ = means.sum(dim=1, keepdim=True)
                 log_stds_ = log_stds.sum(dim=1, keepdim=True)
@@ -70,18 +70,18 @@ class MADDPG(Model):
             restore_actions = restore_mask * actions
             action_out = (means, log_stds)
         else:
-            logits, _, _ = self.policy(state) if not target else self.target_net.policy(state)
+            logits, _, hiddens = self.policy(state, last_hid=last_hid) if not target else self.target_net.policy(state, last_hid=last_hid)
             logits[actions_avail == 0] = -9999999
             actions, log_prob_a = select_action(self.args, logits, status=status, exploration=exploration)
             restore_actions = actions
             action_out = logits
-        return actions, restore_actions, log_prob_a, action_out
+        return actions, restore_actions, log_prob_a, action_out, hiddens
 
     def get_loss(self, batch):
         batch_size = len(batch.state)
-        state, actions, old_log_prob_a, old_values, old_next_values, rewards, next_state, done, last_step, actions_avail = self.unpack_data(batch)
-        _, actions_pol, log_prob_a, action_out = self.get_actions(state, status='train', exploration=False, actions_avail=actions_avail, target=False)
-        _, next_actions, _, _ = self.get_actions(next_state, status='train', exploration=False, actions_avail=actions_avail, target=self.args.target)
+        state, actions, old_log_prob_a, old_values, old_next_values, rewards, next_state, done, last_step, actions_avail, last_hids, hids = self.unpack_data(batch)
+        _, actions_pol, log_prob_a, action_out, _ = self.get_actions(state, status='train', exploration=False, actions_avail=actions_avail, target=False, last_hid=last_hids)
+        _, next_actions, _, _, _ = self.get_actions(next_state, status='train', exploration=False, actions_avail=actions_avail, target=self.args.target, last_hid=hids)
         values_pol = self.value(state, actions_pol).contiguous().view(-1, self.n_)
         values = self.value(state, actions).contiguous().view(-1, self.n_)
         next_values = self.target_net.value(next_state, next_actions.detach()).contiguous().view(-1, self.n_)

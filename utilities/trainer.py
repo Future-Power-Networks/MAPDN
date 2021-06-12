@@ -20,12 +20,12 @@ class PGTrainer(object):
             self.behaviour_net = model(self.args).cuda() if self.cuda_ else model(self.args)
         if self.args.replay:
             if not self.episodic:
-                self.replay_buffer = TransReplayBuffer(int(self.args.replay_buffer_size))
+                self.replay_buffer = TransReplayBuffer( int(self.args.replay_buffer_size) )
             else:
-                self.replay_buffer = EpisodeReplayBuffer(int(self.args.replay_buffer_size))
+                self.replay_buffer = EpisodeReplayBuffer( int(self.args.replay_buffer_size) )
         self.env = env
-        self.policy_optimizer = optim.RMSprop(self.behaviour_net.policy_dicts.parameters(), lr=args.policy_lrate)
-        self.value_optimizer = optim.RMSprop(self.behaviour_net.value_dicts.parameters(), lr=args.value_lrate)
+        self.policy_optimizer = optim.RMSprop( self.behaviour_net.policy_dicts.parameters(), lr=args.policy_lrate )
+        self.value_optimizer = optim.RMSprop( self.behaviour_net.value_dicts.parameters(), lr=args.value_lrate )
         self.init_action = cuda_wrapper( torch.zeros(1, self.args.agent_num, self.args.action_dim), cuda=self.cuda_ )
         self.steps = 0
         self.episodes = 0
@@ -39,7 +39,7 @@ class PGTrainer(object):
         if self.entr > 0:
             if self.args.continuous:
                 policy_loss, means, log_stds = loss
-                entropy = normal_entropy(means, log_stds.exp())
+                entropy = normal_entropy( means, log_stds.exp() )
             else:
                 policy_loss, logits = loss
                 entropy = multinomial_entropy(logits)
@@ -97,16 +97,16 @@ class PGTrainer(object):
 
     def run(self, stat, episode):
         self.behaviour_net.train_process(stat, self)
-        if episode%self.args.eval_freq == 0:
+        if (episode%self.args.eval_freq == self.args.eval_freq-1) or (episode == 0):
             self.behaviour_net.evaluation(stat, self)
 
     def logging(self, stat):
         for k, v in stat.items():
-            self.logger.add_scalar('data/'+k, v, self.episodes)
+            self.logger.add_scalar('data/' + k, v, self.episodes)
 
     def print_info(self, stat):
         string = [f'Episode: {self.episodes}']
         for k, v in stat.items():
-            string.append(k+f': {v:2.4f}')
+            string.append( k + f': {v:2.4f}' )
         string = "\n".join(string)
         print (string)

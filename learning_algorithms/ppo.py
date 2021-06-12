@@ -12,11 +12,11 @@ class PPO(ReinforcementLearning):
 
     def get_loss(self, batch, behaviour_net, target_net):
         batch_size = len(batch.state)
-        state, actions, old_log_prob_a, old_values, old_next_values, rewards, next_state, done, last_step, actions_avail = behaviour_net.unpack_data(batch)
+        state, actions, old_log_prob_a, old_values, old_next_values, rewards, next_state, done, last_step, actions_avail, last_hids, hids = behaviour_net.unpack_data(batch)
         old_values = old_values.squeeze(-1)
         old_next_values = old_next_values.squeeze(-1)
         if self.args.continuous:
-            means, log_stds, _ = behaviour_net.policy(state)
+            means, log_stds, _ = behaviour_net.policy(state, last_hid=last_hids)
             if means.size(-1) > 1:
                 means_ = means.sum(dim=1, keepdim=True)
                 log_stds_ = log_stds.sum(dim=1, keepdim=True)
@@ -29,7 +29,7 @@ class PPO(ReinforcementLearning):
             log_prob_a = (restore_mask * log_prob_a).sum(dim=-1)
             old_log_prob_a = (restore_mask * old_log_prob_a).sum(dim=-1)
         else:
-            logits, _ = behaviour_net.policy(state)
+            logits, _ = behaviour_net.policy(state, last_hid=last_hids)
             logits[actions_avail == 0] = -9999999
             action_out = logits
             log_prob_a = multinomials_log_density(actions, logits)
