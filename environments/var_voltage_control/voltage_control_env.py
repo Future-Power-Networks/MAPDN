@@ -57,7 +57,7 @@ class VoltageControl(MultiAgentEnv):
 
         # define action space and observation space
         self.action_space = ActionSpace(low=-self.args.action_scale+self.args.action_bias, high=self.args.action_scale+self.args.action_bias)
-        self.forecast_horizon = getattr(args, "forecast_horizon", 1)
+        self.horizon = getattr(args, "horizon", 1)
         self.state_space = getattr(args, "state_space", ["pv", "demand", "reactive", "vm_pu", "va_degree"])
         if self.args.mode == "distributed":
             self.n_actions = 1
@@ -79,7 +79,7 @@ class VoltageControl(MultiAgentEnv):
         # reset the time step, cumulative rewards and obs history
         self.steps = 1
         self.sum_rewards = 0
-        if self.forecast_horizon > 1:
+        if self.horizon > 1:
             self.obs_history = {i: [] for i in range(self.n_agents)}
         # reset the power grid
         self.powergrid = copy.deepcopy(self.base_powergrid)
@@ -91,9 +91,9 @@ class VoltageControl(MultiAgentEnv):
                 self._episode_start_day = self._select_start_day()
                 self._episode_start_quarter = self._select_start_quarter()
             # get one episode of data
-            self.pv_forecasts = self._get_episode_pv_forecast()
-            self.active_demand_forecasts = self._get_episode_active_demand_forecast()
-            self.reactive_demand_forecasts = self._get_episode_reactive_demand_forecast()
+            self.pv_histories = self._get_episode_pv_history()
+            self.active_demand_histories = self._get_episode_active_demand_history()
+            self.reactive_demand_histories = self._get_episode_reactive_demand_history()
             self._set_demand_and_pv()
             # random initialise action
             if self.args.reset_action:
@@ -116,7 +116,7 @@ class VoltageControl(MultiAgentEnv):
         # reset the time step, cumulative rewards and obs history
         self.steps = 1
         self.sum_rewards = 0
-        if self.forecast_horizon > 1:
+        if self.horizon > 1:
             self.obs_history = {i: [] for i in range(self.n_agents)}
         # reset the power grid
         self.powergrid = copy.deepcopy(self.base_powergrid)
@@ -127,9 +127,9 @@ class VoltageControl(MultiAgentEnv):
         solvable = False
         while not solvable:
             # get one episode of data
-            self.pv_forecasts = self._get_episode_pv_forecast()
-            self.active_demand_forecasts = self._get_episode_active_demand_forecast()
-            self.reactive_demand_forecasts = self._get_episode_reactive_demand_forecast()
+            self.pv_histories = self._get_episode_pv_history()
+            self.active_demand_histories = self._get_episode_active_demand_history()
+            self.reactive_demand_histories = self._get_episode_reactive_demand_history()
             self._set_demand_and_pv(add_noise=False)
             # random initialise action
             if self.args.reset_action:
@@ -273,14 +273,14 @@ class VoltageControl(MultiAgentEnv):
                 agents_obs.append(pad_obs_zone)
                 # extend to the axis 0
                 # agents_obs.append(pad_obs_zone[np.newaxis, :])
-        if self.forecast_horizon > 1:
+        if self.horizon > 1:
             agents_obs_ = []
             # obs_shape = (obs_shape,)
             for i, obs in enumerate(agents_obs):
-                if len(self.obs_history[i]) >= self.forecast_horizon - 1:
-                    obs_ = np.concatenate(self.obs_history[i][-self.forecast_horizon+1:]+[obs], axis=0)
+                if len(self.obs_history[i]) >= self.horizon - 1:
+                    obs_ = np.concatenate(self.obs_history[i][-self.horizon+1:]+[obs], axis=0)
                 else:
-                    zeros = [np.zeros_like(obs)] * ( self.forecast_horizon - len(self.obs_history[i]) - 1 )
+                    zeros = [np.zeros_like(obs)] * ( self.horizon - len(self.obs_history[i]) - 1 )
                     obs_ = self.obs_history[i] + [obs]
                     obs_ = zeros + obs_
                     obs_ = np.concatenate(obs_, axis=0)
@@ -418,78 +418,71 @@ class VoltageControl(MultiAgentEnv):
         demand = demand.iloc[::1, 1:] * self.args.demand_scale
         return demand
 
-    def _get_episode_pv_forecast(self):
-        """return the pv forecast in an episode
+    def _get_episode_pv_history(self):
+        """return the pv history in an episode
         """
         episode_length = self.episode_limit
-        horizon = self.forecast_horizon
+        horizon = self.horizon
         # convert the start date to quarters
         start = self._episode_start_quarter + self._episode_start_hour * 4 + self._episode_start_day * 24 * 4
         nr_quarters = episode_length + horizon + 1  # margin of 1
-        episode_pv_forecast = self.pv_data[start:start + nr_quarters].values
-        return episode_pv_forecast
+        episode_pv_history = self.pv_data[start:start + nr_quarters].values
+        return episode_pv_history
     
-    def _get_episode_active_demand_forecast(self):
-        """return the active power forecasts for all loads in an episode
+    def _get_episode_active_demand_history(self):
+        """return the active power histories for all loads in an episode
         """
         episode_length = self.episode_limit
-        horizon = self.forecast_horizon
+        horizon = self.horizon
         start = self._episode_start_quarter + self._episode_start_hour * 4 + self._episode_start_day * 24 * 4
         nr_quarters = episode_length + horizon + 1  # margin of 1
-        episode_demand_forecast = self.active_demand_data[start:start + nr_quarters].values
-        return episode_demand_forecast
+        episode_demand_history = self.active_demand_data[start:start + nr_quarters].values
+        return episode_demand_history
     
-    def _get_episode_reactive_demand_forecast(self):
-        """return the reactive power forecasts for all loads in an episode
+    def _get_episode_reactive_demand_history(self):
+        """return the reactive power histories for all loads in an episode
         """
         episode_length = self.episode_limit
-        horizon = self.forecast_horizon
+        horizon = self.horizon
         start = self._episode_start_quarter + self._episode_start_hour * 4 + self._episode_start_day * 24 * 4
         nr_quarters = episode_length + horizon + 1  # margin of 1
-        episode_demand_forecast = self.reactive_demand_data[start:start + nr_quarters].values
-        return episode_demand_forecast
+        episode_demand_history = self.reactive_demand_data[start:start + nr_quarters].values
+        return episode_demand_history
 
-    def _get_pv_forecast(self):
-        """returns pv forecast for the next lookahead hours
+    def _get_pv_history(self):
+        """returns pv history
         """
         t = self.steps
-        horizon = self.forecast_horizon
-        return self.pv_forecasts[t:t+horizon, :]
+        horizon = self.horizon
+        return self.pv_histories[t:t+horizon, :]
 
-    def _get_active_demand_forecast(self):
-        """return the forecasted hourly demand for the next lookahead hours
+    def _get_active_demand_history(self):
+        """return the history demand
         """
         t = self.steps
-        horizon = self.forecast_horizon
-        return self.active_demand_forecasts[t:t+horizon, :]
+        horizon = self.horizon
+        return self.active_demand_histories[t:t+horizon, :]
     
-    def _get_reactive_demand_forecast(self):
-        """return the forecasted hourly demand for the next lookahead hours
+    def _get_reactive_demand_history(self):
+        """return the history demand
         """
         t = self.steps
-        horizon = self.forecast_horizon
-        return self.reactive_demand_forecasts[t:t+horizon, :]
-    
-    def _get_pv_forecast(self):
-        """returns solar forecast for the next lookahead hours
-        """
-        t = self.steps
-        horizon = self.forecast_horizon
-        return self.pv_forecasts[t:t+horizon, :]
+        horizon = self.horizon
+        return self.reactive_demand_histories[t:t+horizon, :]
 
     # TODO: DOUBLE CHECK
     def _set_demand_and_pv(self, add_noise=True):
-        """update the demand and pv production according to the forecasts with some i.i.d. noise.
+        """update the demand and pv production according to the histories with some i.i.d. noise.
         """ 
-        pv = copy.copy(self._get_pv_forecast()[0, :])
+        pv = copy.copy(self._get_pv_history()[0, :])
         # add uncertainty to pv data with unit truncated gaussian (only positive accepted)
         if add_noise:
             pv += self.pv_std * np.abs(np.random.randn(*pv.shape))
-        active_demand = copy.copy(self._get_active_demand_forecast()[0, :])
+        active_demand = copy.copy(self._get_active_demand_history()[0, :])
         # add uncertainty to active power of demand data with unit truncated gaussian (only positive accepted)
         if add_noise:
             active_demand += self.active_demand_std * np.abs(np.random.randn(*active_demand.shape))
-        reactive_demand = copy.copy(self._get_reactive_demand_forecast()[0, :])
+        reactive_demand = copy.copy(self._get_reactive_demand_history()[0, :])
         # add uncertainty to reactive power of demand data with unit truncated gaussian (only positive accepted)
         if add_noise:
             reactive_demand += self.reactive_demand_std * np.abs(np.random.randn(*reactive_demand.shape))
