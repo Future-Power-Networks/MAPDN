@@ -19,8 +19,10 @@ class MADDPG(Model):
             self.reload_params_to_target()
 
     def construct_value_net(self):
-        input_shape = (self.obs_dim + self.act_dim) * self.n_ + self.n_
-        # input_shape = (self.obs_dim + self.act_dim) * self.n_
+        if self.args.agent_id:
+            input_shape = (self.obs_dim + self.act_dim) * self.n_ + self.n_
+        else:
+            input_shape = (self.obs_dim + self.act_dim) * self.n_
         output_shape = 1
         self.value_dicts = nn.ModuleList( [ MLPCritic(input_shape, output_shape, self.args) ] )
 
@@ -37,17 +39,21 @@ class MADDPG(Model):
         obs_reshape = obs_repeat.contiguous().view(batch_size, self.n_, -1) # shape = (b, n, n*o)
 
         # add agent id
-        agent_ids = torch.eye(self.n_).unsqueeze(0).repeat(batch_size, 1, 1) # shape = (b, n, n)
-        agent_ids = cuda_wrapper(agent_ids, self.cuda_)
-        obs_reshape = torch.cat( (obs_reshape, agent_ids), dim=-1 ) # shape = (b, n, n*o+n)
+        if self.args.agent_id:
+            agent_ids = torch.eye(self.n_).unsqueeze(0).repeat(batch_size, 1, 1) # shape = (b, n, n)
+            agent_ids = cuda_wrapper(agent_ids, self.cuda_)
+            obs_reshape = torch.cat( (obs_reshape, agent_ids), dim=-1 ) # shape = (b, n, n*o+n)
 
         obs_reshape = obs_reshape.contiguous().view( batch_size*self.n_, -1 ) # shape = (b*n, n*o+n)
         act_repeat = act.unsqueeze(1).repeat(1, self.n_, 1, 1) # shape = (b, n, n, a)
+
+        # detach other agents' actions
         for bm in act_repeat:
             for i, nm in enumerate(bm):
                 for j, a in enumerate(nm):
                     if j != i:
                         a = a.detach()
+
         act_reshape = act_repeat.contiguous().view( batch_size*self.n_, -1 ) # shape = (b*n, n*a)
         inputs = torch.cat( (obs_reshape, act_reshape), dim=-1 )
         agent_value = self.value_dicts[0]

@@ -84,11 +84,12 @@ class Model(nn.Module):
         batch_size = obs.size(0)
 
         # add agent id
-        agent_ids = torch.eye(self.n_).unsqueeze(0).repeat(batch_size, 1, 1) # shape = (b, n, n)
-        agent_ids = cuda_wrapper(agent_ids, self.cuda_)
-        obs = torch.cat( (obs, agent_ids), dim=-1 )
+        if self.args.agent_id:
+            agent_ids = torch.eye(self.n_).unsqueeze(0).repeat(batch_size, 1, 1) # shape = (b, n, n)
+            agent_ids = cuda_wrapper(agent_ids, self.cuda_)
+            obs = torch.cat( (obs, agent_ids), dim=-1 ) # shape = (b, n, n+o)
 
-        obs = obs.contiguous().view(batch_size*self.n_, -1)
+        obs = obs.contiguous().view(batch_size*self.n_, -1) # shape = (b*n, n+o/o)
         agent_policy = self.policy_dicts[0]
         means, hiddens = agent_policy(obs, last_hid)
         # hiddens = torch.stack(hiddens, dim=1)
@@ -103,15 +104,18 @@ class Model(nn.Module):
     def construct_policy_net(self):
         if self.args.agent_type == 'mlp':
             from agents.mlp_agent import MLPAgent
-            self.policy_dicts = nn.ModuleList([ MLPAgent(self.obs_dim + self.n_, self.args) ])
+            if self.args.agent_id:
+                self.policy_dicts = nn.ModuleList([ MLPAgent(self.obs_dim + self.n_, self.args) ])
+            else:
+                self.policy_dicts = nn.ModuleList([ MLPAgent(self.obs_dim, self.args) ])
         elif self.args.agent_type == 'rnn':     
             from agents.rnn_agent import RNNAgent
-            self.policy_dicts = nn.ModuleList([ RNNAgent(self.obs_dim + self.n_, self.args) ])
+            if self.args.agent_id:
+                self.policy_dicts = nn.ModuleList([ RNNAgent(self.obs_dim + self.n_, self.args) ])
+            else:
+                self.policy_dicts = nn.ModuleList([ RNNAgent(self.obs_dim, self.args) ])
         else:
             NotImplementedError()
-        # self.policy_dicts = nn.ModuleList([ MLPAgent(self.obs_dim + self.n_, self.args) ])
-        # self.policy_dicts = nn.ModuleList([ RNNAgent(self.obs_dim + self.n_, self.args) ])
-        # self.policy_dicts = nn.ModuleList([ MLPAgent(self.obs_dim, self.args) ])
 
     def construct_value_net(self):
         raise NotImplementedError()
@@ -148,6 +152,7 @@ class Model(nn.Module):
 
         # reset env
         state, global_state = trainer.env.reset()
+
         # init hidden states
         last_hid = self.policy_dicts[0].init_hidden()
 
@@ -181,8 +186,6 @@ class Model(nn.Module):
                                     last_hid.detach().cpu().numpy(),
                                     hid.detach().cpu().numpy()
                                    )
-            # set the next last_hid
-            last_hid = hid
             if not self.args.episodic:
                 self.transition_update(trainer, trans, stat)
             else:
@@ -196,7 +199,10 @@ class Model(nn.Module):
             trainer.steps += 1
             if done_:
                 break
+            # set the next state
             state = next_state
+            # set the next last_hid
+            last_hid = hid
         trainer.episodes += 1
         for k, v in stat_train.items():
             key_name = k.split('_')
@@ -228,10 +234,12 @@ class Model(nn.Module):
                     else:
                         stat_test_epi['mean_test_' + k] += v
                 stat_test_epi['mean_test_reward'] += reward
-                last_hid = hid
                 if done_:
                     break
+                # set the next state
                 state = next_state
+                # set the next last_hid
+                last_hid = hid
             for k, v in stat_test_epi.items():
                 stat_test_epi[k] = v / float(t+1)
             for k, v in stat_test_epi.items():

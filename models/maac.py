@@ -62,18 +62,10 @@ class MAAC(Model):
         '''
         # obs_shape = (b, n, o)
         # act_shape = (b, n, a)
-        batch_size = obs.size(0)
-
-        # # add agent id
-        # agent_ids = torch.eye(self.n_).unsqueeze(0).repeat(batch_size, 1, 1) # shape = (b, n, n)
-        # agent_ids = cuda_wrapper(agent_ids, self.cuda_)
-        # obs_chk = torch.cat( (obs, agent_ids), dim=-1 )
-        # obs_chunks = [chk.squeeze(1) for chk in torch.chunk(obs_chk, self.n_, dim=1)]
 
         obs_chunks = [chk.squeeze(1) for chk in torch.chunk(obs, self.n_, dim=1)]
         act_chunks = [chk.squeeze(1) for chk in torch.chunk(act, self.n_, dim=1)]
         
-        # inps_chk = torch.cat( (obs, act, agent_ids), dim=-1 ) 
         inps_chk = torch.cat( (obs, act), dim=-1 ) 
         sa_chunks = [chk.squeeze(1) for chk in torch.chunk(inps_chk, self.n_, dim=1)]
         inps = (obs_chunks, act_chunks, sa_chunks)

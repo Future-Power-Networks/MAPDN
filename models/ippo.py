@@ -19,20 +19,26 @@ class IPPO(Model):
         self.rl = PPO(self.args)
 
     def construct_value_net(self):
-        input_shape = self.obs_dim + self.n_ # it is a v(s) rather than q(s, a)
-        # input_shape = self.obs_dim # it is a v(s) rather than q(s, a)
+        if self.args.agent_id:
+            input_shape = self.obs_dim + self.n_ # it is a v(s) rather than q(s, a)
+        else:
+            input_shape = self.obs_dim # it is a v(s) rather than q(s, a)
         output_shape = 1
         self.value_dicts = nn.ModuleList( [ MLPCritic(input_shape, output_shape, self.args) ] )
 
     def construct_policy_net(self):
-        # self.policy_dicts = nn.ModuleList([ MLPAgent(self.obs_dim+self.n_, self.args) ])
-        # self.policy_dicts = nn.ModuleList([ MLPAgent(self.obs_dim, self.args) ])
         if self.args.agent_type == 'mlp':
             from agents.mlp_agent_ppo import MLPAgent
-            self.policy_dicts = nn.ModuleList([ MLPAgent(self.obs_dim+self.n_, self.args) ])
+            if self.args.agent_id:
+                self.policy_dicts = nn.ModuleList([ MLPAgent(self.obs_dim + self.n_, self.args) ])
+            else:
+                self.policy_dicts = nn.ModuleList([ MLPAgent(self.obs_dim, self.args) ])
         elif self.args.agent_type == 'rnn':
             from agents.rnn_agent_ppo import RNNAgent
-            self.policy_dicts = nn.ModuleList([ RNNAgent(self.obs_dim+self.n_, self.args) ])
+            if self.args.agent_id:
+                self.policy_dicts = nn.ModuleList([ RNNAgent(self.obs_dim + self.n_, self.args) ])
+            else:
+                self.policy_dicts = nn.ModuleList([ RNNAgent(self.obs_dim, self.args) ])
         else:
             NotImplementedError()
         
@@ -46,11 +52,12 @@ class IPPO(Model):
         batch_size = obs.size(0)
 
         # add agent id
-        agent_ids = torch.eye(self.n_).unsqueeze(0).repeat(batch_size, 1, 1) # shape = (b, n, n)
-        agent_ids = cuda_wrapper(agent_ids, self.cuda_)
-        obs = torch.cat( (obs, agent_ids), dim=-1 ) # shape = (b, n, o+n)
+        if self.args.agent_id:
+            agent_ids = torch.eye(self.n_).unsqueeze(0).repeat(batch_size, 1, 1) # shape = (b, n, n)
+            agent_ids = cuda_wrapper(agent_ids, self.cuda_)
+            obs = torch.cat( (obs, agent_ids), dim=-1 ) # shape = (b, n, o+n)
 
-        obs = obs.contiguous().view(batch_size*self.n_, -1)
+        obs = obs.contiguous().view(batch_size*self.n_, -1) # shape = (b*n, o+n/o)
 
         agent_value = self.value_dicts[0]
         inputs = obs

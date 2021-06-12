@@ -18,12 +18,16 @@ class COMA(Model):
 
     def construct_value_net(self):
         if self.args.continuous:
-            input_shape = (self.n_ + 1) * self.obs_dim + self.n_ * self.act_dim + self.n_
-            # input_shape = (self.n_ + 1) * self.obs_dim + self.n_ * self.act_dim
+            if self.args.agent_id:
+                input_shape = (self.n_ + 1) * self.obs_dim + self.n_ * self.act_dim + self.n_
+            else:
+                input_shape = (self.n_ + 1) * self.obs_dim + self.n_ * self.act_dim
             output_shape = 1
         else:
-            input_shape = (self.n_ + 1) * self.obs_dim + self.n_ * self.act_dim + self.n_
-            # input_shape = (self.n_ + 1) * self.obs_dim + self.n_ * self.act_dim
+            if self.args.agent_id:
+                input_shape = (self.n_ + 1) * self.obs_dim + self.n_ * self.act_dim + self.n_
+            else:
+                input_shape = (self.n_ + 1) * self.obs_dim + self.n_ * self.act_dim
             output_shape = self.act_dim
         self.value_dicts = nn.ModuleList( [ MLPCritic(input_shape, output_shape, self.args) ] )
 
@@ -48,12 +52,14 @@ class COMA(Model):
             inp = torch.cat((obs, obs_own), dim=-1) # shape = (b, n, o*n+o)
 
         # add agent id
-        agent_ids = torch.eye(self.n_).unsqueeze(0).repeat(inp.size(0), 1, 1) # shape = (b/s*b, n, n)
-        agent_ids = cuda_wrapper(agent_ids, self.cuda_)
-        inp = torch.cat( (inp, agent_ids), dim=-1 ) # shape = (b/s*b, n, o*n+o+n)
+        if self.args.agent_id:
+            agent_ids = torch.eye(self.n_).unsqueeze(0).repeat(inp.size(0), 1, 1) # shape = (b/s*b, n, n)
+            agent_ids = cuda_wrapper(agent_ids, self.cuda_)
+            inp = torch.cat( (inp, agent_ids), dim=-1 ) # shape = (b/s*b, n, o*n+o+n)
+            inp = inp.contiguous().view( -1, self.obs_dim*(self.n_+1)+self.n_ ) # shape = (b/s*b, o*n+o+n)
+        else:
+            inp = inp.contiguous().view( -1, self.obs_dim*(self.n_+1) ) # shape = (b/s*b, o*n+o)
 
-        inp = inp.contiguous().view( -1, self.obs_dim*(self.n_+1)+self.n_ ) # shape = (b/s*b, o*n+o+n)
-        # inp = inp.contiguous().view( -1, self.obs_dim*(self.n_+1) ) # shape = (b/s*b, o*n+o)
         agent_value = self.value_dicts[0]
 
         if self.args.continuous:
@@ -73,6 +79,7 @@ class COMA(Model):
             act_mask_out = agent_mask_complement * act_repeat # shape = (b, n, n, a)
             act_other = act_mask_out.contiguous().view(-1, self.n_*self.act_dim) # shape = (b*n, n*a)
             inputs = torch.cat( (inp, act_other), dim=-1 )
+
         values, _ = agent_value(inputs, None)
         values = values.contiguous().view(batch_size, self.n_, -1)
 
@@ -150,7 +157,6 @@ class COMA(Model):
             returns[i] = rewards[i] + self.args.gamma * next_return
         # value loss
         deltas = returns - values
-        # value_loss = deltas.pow(2).mean(dim=0)
         value_loss = deltas.pow(2).mean()
         # actio loss
         advantages = ( values - baselines ).detach()
@@ -161,6 +167,5 @@ class COMA(Model):
         log_prob_a = log_prob_a.squeeze(-1)
         assert log_prob_a.size() == advantages.size(), f"log_prob size is: {log_prob_a.size()} and advantages size is {advantages.size()}."
         policy_loss = - advantages * log_prob_a
-        # policy_loss = policy_loss.mean(dim=0)
         policy_loss = policy_loss.mean()
         return policy_loss, value_loss, action_out

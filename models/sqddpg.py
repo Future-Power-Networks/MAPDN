@@ -18,8 +18,11 @@ class SQDDPG(Model):
         self.sample_size = self.args.sample_size
 
     def construct_value_net(self):
-        input_shape = (self.obs_dim + self.act_dim) * self.n_ + self.n_
-        # input_shape = (self.obs_dim + self.act_dim) * self.n_
+        # if self.args.agent_id:
+        #     input_shape = (self.obs_dim + self.act_dim) * self.n_ + self.n_
+        # else:
+        #     input_shape = (self.obs_dim + self.act_dim) * self.n_
+        input_shape = (self.obs_dim + self.act_dim) * self.n_
         output_shape = 1
         self.value_dicts = nn.ModuleList( [ MLPCritic(input_shape, output_shape, self.args) ] )
 
@@ -35,24 +38,20 @@ class SQDDPG(Model):
         individual_map = individual_map.contiguous().view(batch_size, self.sample_size, self.n_, self.n_)
         subcoalition_map = torch.matmul(individual_map, seq_set)
         grand_coalitions = grand_coalitions.unsqueeze(1).expand(batch_size*self.sample_size, self.n_, self.n_).contiguous().view(batch_size, self.sample_size, self.n_, self.n_) # shape = (b, n_s, n, n)
-        return subcoalition_map, grand_coalitions
+        return subcoalition_map, grand_coalitions, individual_map
 
     def marginal_contribution(self, obs, act):
         batch_size = obs.size(0)
-        subcoalition_map, grand_coalitions = self.sample_grandcoalitions(batch_size) # shape = (b, n_s, n, n)
+        subcoalition_map, grand_coalitions, individual_map = self.sample_grandcoalitions(batch_size) # shape = (b, n_s, n, n)
         grand_coalitions_expand = grand_coalitions.unsqueeze(-1).expand(batch_size, self.sample_size, self.n_, self.n_, self.act_dim) # shape = (b, n_s, n, n, a)
         act = act.unsqueeze(1).unsqueeze(2).expand(batch_size, self.sample_size, self.n_, self.n_, self.act_dim).gather(3, grand_coalitions_expand) # shape = (b, n, a) -> (b, 1, 1, n, a) -> (b, n_s, n, n, a)
-        act_map = subcoalition_map.unsqueeze(-1).float() # shape = (b, n_s, n, n, 1)
-        act = act * act_map # shape = (b, n_s, n, n, a)
-
-        # detach the gradient of other agents
-        # act = act.contiguous().view(batch_size*self.sample_size, self.n_, self.n_, -1) # shape = (b*n_s, n, n, a)
-        # grand_coalitions = grand_coalitions.contiguous().view(batch_size*self.sample_size, self.n_, self.n_) # shape = (b*n_s, n, n)
-        # for i, ba in enumerate(act):
-        #     for j, nna in enumerate(ba):
-        #         for k, na in enumerate(nna):
-        #             if grand_coalitions[i, j, j] != k:
-        #                 na = na.detach()
+        subcoalition_map_no_i = subcoalition_map - individual_map # shape = (b, n_s, n, n)
+        subcoalition_map_no_i = subcoalition_map_no_i.unsqueeze(-1) # shape = (b, n_s, n, n, 1)
+        individual_map = individual_map.unsqueeze(-1) # shape = (b, n_s, n, n, 1)
+        act_no_i = act * subcoalition_map_no_i
+        act_i = act * individual_map
+        # detach other agents' actions
+        act = act_no_i.detach() + act_i # shape = (b, n_s, n, n, a)
 
         act = act.contiguous().view(batch_size, self.sample_size, self.n_, -1) # shape = (b, n_s, n, n*a)
         obs = obs.unsqueeze(1).unsqueeze(2).expand(batch_size, self.sample_size, self.n_, self.n_, self.obs_dim) # shape = (b, n, o) -> (b, 1, n, o) -> (b, 1, 1, n, o) -> (b, n_s, n, n, o)
@@ -62,12 +61,12 @@ class SQDDPG(Model):
         inp = inp.contiguous().view(batch_size*self.sample_size, self.n_, -1) # shape = (b*n_s, n, n*o+n*a)
 
         # add agent id
-        agent_ids = torch.eye(self.n_).unsqueeze(0).repeat(batch_size*self.sample_size, 1, 1) # shape = (b*n_s, n, n)
-        agent_ids = cuda_wrapper(agent_ids, self.cuda_)
-        inp = torch.cat( (inp, agent_ids), dim=-1 ) # shape = (b*n_s, n, n*o+n*a+n)
+        # if self.args.agent_id:
+        #     agent_ids = torch.eye(self.n_).unsqueeze(0).repeat(batch_size*self.sample_size, 1, 1) # shape = (b*n_s, n, n)
+        #     agent_ids = cuda_wrapper(agent_ids, self.cuda_)
+        #     inp = torch.cat( (inp, agent_ids), dim=-1 ) # shape = (b*n_s, n, n*o+n*a+n)
+        inputs = inp.contiguous().view( batch_size*self.sample_size*self.n_, -1 ) # shape = (b*n_s*n, n*o+n*a/n*o+n*a+n)
 
-        # inputs = inp.contiguous().view( -1, self.n_ * (self.obs_dim + self.act_dim + 1) ) # shape = (-1, n*o+n*a+n)
-        inputs = inp.contiguous().view( batch_size*self.sample_size*self.n_, -1 ) # shape = (b*n_s*n, n*o+n*a+n)
         agent_value = self.value_dicts[0]
         values, _ = agent_value(inputs, None)
         values = values.contiguous().view(batch_size, self.sample_size, self.n_, 1) # shape = (b, n_s, n, 1)

@@ -19,8 +19,10 @@ class IDDPG(Model):
         self.rl = DDPG(self.args)
 
     def construct_value_net(self):
-        input_shape = self.obs_dim + self.act_dim + self.n_
-        # input_shape = self.obs_dim + self.act_dim
+        if self.args.agent_id:
+            input_shape = self.obs_dim + self.act_dim + self.n_
+        else:
+            input_shape = self.obs_dim + self.act_dim
         output_shape = 1
         self.value_dicts = nn.ModuleList( [ MLPCritic(input_shape, output_shape, self.args) ] )
 
@@ -34,17 +36,19 @@ class IDDPG(Model):
         batch_size = obs.size(0)
 
         # add agent id
-        agent_ids = torch.eye(self.n_).unsqueeze(0).repeat(batch_size, 1, 1) # shape = (b, n, n)
-        agent_ids = cuda_wrapper(agent_ids, self.cuda_)
-        obs = torch.cat( (obs, agent_ids), dim=-1 ) # shape = (b, n, o+n)
+        if self.args.agent_id:
+            agent_ids = torch.eye(self.n_).unsqueeze(0).repeat(batch_size, 1, 1) # shape = (b, n, n)
+            agent_ids = cuda_wrapper(agent_ids, self.cuda_)
+            obs = torch.cat( (obs, agent_ids), dim=-1 ) # shape = (b, n, o+n)
 
-        obs = obs.contiguous().view(batch_size*self.n_, -1)
-        act = act.contiguous().view(batch_size*self.n_, -1)
+        obs = obs.contiguous().view(batch_size*self.n_, -1) # shape = (b*n, o+n/o)
+        act = act.contiguous().view(batch_size*self.n_, -1) # shape = (b*n, a)
         agent_value = self.value_dicts[0]
-        if self.args.continuous:
-            inputs = torch.cat([obs, act], dim=1)
-        else:
-            inputs = obs
+        inputs = torch.cat([obs, act], dim=1)
+        # if self.args.continuous:
+        #     inputs = torch.cat([obs, act], dim=1)
+        # else:
+        #     inputs = obs
         values, _ = agent_value(inputs, None)
         values = values.contiguous().view(batch_size, self.n_, -1)
 

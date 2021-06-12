@@ -18,11 +18,11 @@ class MATD3(Model):
             self.reload_params_to_target()
 
     def construct_value_net(self):
-        # input_shape = (self.obs_dim + self.act_dim) * self.n_
-        input_shape = (self.obs_dim + self.act_dim) * self.n_ + 1 + self.n_
-        # input_shape = (self.obs_dim + self.act_dim) * self.n_ + 1
+        if self.args.agent_id:
+            input_shape = (self.obs_dim + self.act_dim) * self.n_ + 1 + self.n_
+        else:
+            input_shape = (self.obs_dim + self.act_dim) * self.n_ + 1
         output_shape = 1
-        # self.value_dicts = nn.ModuleList( [ MLPCritic(input_shape, output_shape, self.args) for _ in range(self.n_*2) ] )
         self.value_dicts = nn.ModuleList( [ MLPCritic(input_shape, output_shape, self.args) ] )
 
     def construct_model(self):
@@ -38,12 +38,12 @@ class MATD3(Model):
         obs_reshape = obs_repeat.contiguous().view(batch_size, self.n_, -1) # shape = (b, n, n*o)
 
         # add agent id
-        agent_ids = torch.eye(self.n_).unsqueeze(0).repeat(batch_size, 1, 1) # shape = (b, n, n)
-        agent_ids = cuda_wrapper(agent_ids, self.cuda_)
-        obs_reshape = torch.cat( (obs_reshape, agent_ids), dim=-1 ) # shape = (b, n, n*o+n)
+        if self.args.agent_id:
+            agent_ids = torch.eye(self.n_).unsqueeze(0).repeat(batch_size, 1, 1) # shape = (b, n, n)
+            agent_ids = cuda_wrapper(agent_ids, self.cuda_)
+            obs_reshape = torch.cat( (obs_reshape, agent_ids), dim=-1 ) # shape = (b, n, n*o+n)
 
-        # obs_reshape = obs_reshape_id.contiguous().view( batch_size*self.n_, -1 ) # shape = (b*n, n*o+n)
-        obs_reshape = obs_reshape.contiguous().view( batch_size*self.n_, -1 ) # shape = (b*n, n*o+n)
+        obs_reshape = obs_reshape.contiguous().view( batch_size*self.n_, -1 ) # shape = (b*n, n*o+n/n*o)
         act_repeat = act.unsqueeze(1).repeat(1, self.n_, 1, 1) # shape = (b, n, n, a)
         for bm in act_repeat:
             for i, nm in enumerate(bm):
