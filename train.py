@@ -30,7 +30,7 @@ data_path = env_config_dict["data_path"].split("/")
 data_path[-1] = argv.scenario
 env_config_dict["data_path"] = "/".join(data_path)
 net_topology = argv.scenario
-assert net_topology in ['bus33bw_gu', 'bus141_gu', 'bus347_gu'], f'{net_topology} is not a valid scenario.'
+assert net_topology in ['bus33bw_gu', 'bus141_gu', 'bus322_gu'], f'{net_topology} is not a valid scenario.'
 if argv.difficulty == "easy":
     env_config_dict["pv_scale"] = 0.5
     env_config_dict["demand_scale"] = 1.0
@@ -40,7 +40,7 @@ if argv.difficulty == "easy":
     elif argv.scenario == 'bus141_gu':
         env_config_dict["action_bias"] = 0.0
         env_config_dict["action_scale"] = 0.8
-    elif argv.scenario == 'bus347_gu':
+    elif argv.scenario == 'bus322_gu':
         env_config_dict["action_bias"] = 0.0
         env_config_dict["action_scale"] = 0.5
 elif argv.difficulty == "hard":
@@ -52,7 +52,7 @@ elif argv.difficulty == "hard":
     elif argv.scenario == 'bus141_gu':
         env_config_dict["action_bias"] = 0.0
         env_config_dict["action_scale"] = 0.8
-    elif argv.scenario == 'bus347_gu':
+    elif argv.scenario == 'bus322_gu':
         env_config_dict["action_bias"] = 0.0
         env_config_dict["action_scale"] = 0.4
 elif argv.difficulty == "super_hard":
@@ -64,7 +64,7 @@ elif argv.difficulty == "super_hard":
     elif argv.scenario == 'bus141_gu':
         env_config_dict["action_bias"] = 0.0
         env_config_dict["action_scale"] = 0.6
-    elif argv.scenario == 'bus347_gu':
+    elif argv.scenario == 'bus322_gu':
         env_config_dict["action_bias"] = 0.0
         env_config_dict["action_scale"] = 0.3
 else:

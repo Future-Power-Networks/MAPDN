@@ -17,17 +17,24 @@ class MAAC(Model):
             self.reload_params_to_target()
 
     def construct_policy_net(self):
-        # TODO: fix policy params update
-        # self.policy_dicts = nn.ModuleList( [ MLPAgent(self.obs_dim + self.n_, self.args) ] )
-        # self.policy_dicts = nn.ModuleList( [ MLPAgent(self.obs_dim, self.args) ] )
+        if self.args.agent_id:
+            input_shape = self.obs_dim + self.n_
+        else:
+            input_shape = self.obs_dim
+
         if self.args.agent_type == 'mlp':
             from agents.mlp_agent_gaussian import MLPAgent
-            self.policy_dicts = nn.ModuleList( [ MLPAgent(self.obs_dim + self.n_, self.args) ] )
+            Agent = MLPAgent
         elif self.args.agent_type == 'rnn':
             from agents.rnn_agent_gaussian import RNNAgent
-            self.policy_dicts = nn.ModuleList( [ RNNAgent(self.obs_dim + self.n_, self.args) ] )
+            Agent = RNNAgent
         else:
             NotImplementedError()
+            
+        if self.args.shared_params:
+            self.policy_dicts = nn.ModuleList([ Agent(input_shape, self.args) ])
+        else:
+            self.policy_dicts = nn.ModuleList([ Agent(input_shape, self.args) for _ in range(self.n_) ])
 
     def construct_value_net(self):
         self.value_dicts = nn.ModuleList( [ AttentionCritic(self.args) ] )
@@ -41,18 +48,32 @@ class MAAC(Model):
         batch_size = obs.size(0)
 
         # add agent id
-        agent_ids = torch.eye(self.n_).unsqueeze(0).repeat(batch_size, 1, 1) # shape = (b, n, n)
-        agent_ids = cuda_wrapper(agent_ids, self.cuda_)
-        obs = torch.cat( (obs, agent_ids), dim=-1 ) # shape = (b, n, o+n)
+        if self.args.agent_id:
+            agent_ids = torch.eye(self.n_).unsqueeze(0).repeat(batch_size, 1, 1) # shape = (b, n, n)
+            agent_ids = cuda_wrapper(agent_ids, self.cuda_)
+            obs = torch.cat( (obs, agent_ids), dim=-1 ) # shape = (b, n, o+n)
 
-        # obs = obs.contiguous().view(-1, self.obs_dim)
-        obs = obs.contiguous().view(batch_size*self.n_, -1)
-        agent_policy = self.policy_dicts[0]
-        means, log_stds, hiddens = agent_policy(obs, last_hid)
-
-        means = means.contiguous().view(batch_size, self.n_, -1)
-        hiddens = hiddens.contiguous().view(batch_size, self.n_, -1)
-        log_stds = log_stds.contiguous().view(batch_size, self.n_, -1)
+        if self.args.shared_params:
+            # print (f"This is the shape of last_hids: {last_hid.size()}")
+            obs = obs.contiguous().view(batch_size*self.n_, -1) # shape = (b*n, n+o/o)
+            agent_policy = self.policy_dicts[0]
+            means, log_stds, hiddens = agent_policy(obs, last_hid)
+            # hiddens = torch.stack(hiddens, dim=1)
+            means = means.contiguous().view(batch_size, self.n_, -1)
+            hiddens = hiddens.contiguous().view(batch_size, self.n_, -1)
+            log_stds = log_stds.contiguous().view(batch_size, self.n_, -1)
+        else:
+            means = []
+            hiddens = []
+            log_stds = []
+            for i, agent_policy in enumerate(self.policy_dicts):
+                mean, log_std, hidden = agent_policy(obs[:, i, :], last_hid[:, i, :])
+                means.append(mean)
+                hiddens.append(hidden)
+                log_stds.append(log_std)
+            means = torch.stack(means, dim=1)
+            hiddens = torch.stack(hiddens, dim=1)
+            log_stds = torch.stack(log_stds, dim=1)
 
         return means, log_stds, hiddens
 
@@ -133,8 +154,6 @@ class MAAC(Model):
         else:
             policy_loss = - advantages.detach() * log_prob_a
         policy_loss += attn_reg.squeeze(0)
-        # policy_loss = policy_loss.mean(dim=0)
-        # value_loss = deltas.pow(2).mean(dim=0)
         policy_loss = policy_loss.mean()
         value_loss = deltas.pow(2).mean()
         return policy_loss, value_loss, action_out

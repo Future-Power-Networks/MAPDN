@@ -24,23 +24,30 @@ class MAPPO(Model):
         else:
             input_shape = self.obs_dim * self.n_ # it is a v(s) rather than q(s, a)
         output_shape = 1
-        self.value_dicts = nn.ModuleList( [ MLPCritic(input_shape, output_shape, self.args) ] )
+        if self.args.shared_params:
+            self.value_dicts = nn.ModuleList( [ MLPCritic(input_shape, output_shape, self.args) ] )
+        else:
+            self.value_dicts = nn.ModuleList( [ MLPCritic(input_shape, output_shape, self.args) for _ in range(self.n_) ] )
 
     def construct_policy_net(self):
+        if self.args.agent_id:
+            input_shape = self.obs_dim + self.n_
+        else:
+            input_shape = self.obs_dim
+
         if self.args.agent_type == 'mlp':
             from agents.mlp_agent_ppo import MLPAgent
-            if self.args.agent_id:
-                self.policy_dicts = nn.ModuleList([ MLPAgent(self.obs_dim + self.n_, self.args) ])
-            else:
-                self.policy_dicts = nn.ModuleList([ MLPAgent(self.obs_dim, self.args) ])
+            Agent = MLPAgent
         elif self.args.agent_type == 'rnn':
             from agents.rnn_agent_ppo import RNNAgent
-            if self.args.agent_id:
-                self.policy_dicts = nn.ModuleList([ RNNAgent(self.obs_dim + self.n_, self.args) ])
-            else:
-                self.policy_dicts = nn.ModuleList([ RNNAgent(self.obs_dim, self.args) ])
+            Agent = RNNAgent
         else:
             NotImplementedError()
+
+        if self.args.shared_params:
+            self.policy_dicts = nn.ModuleList([ Agent(input_shape, self.args) ])
+        else:
+            self.policy_dicts = nn.ModuleList([ Agent(input_shape, self.args) for _ in range(self.n_) ])
 
     def construct_model(self):
         self.construct_value_net()
@@ -62,12 +69,20 @@ class MAPPO(Model):
             inp = torch.cat( (obs, agent_ids), dim=-1 ) # shape = (b, n, o*n+n)
         else:
             inp = obs
+        
+        if self.args.shared_params:
+            inputs = inp.contiguous().view(batch_size*self.n_, -1)
+            agent_value = self.value_dicts[0]
+            values, _ = agent_value(inputs, None)
+            values = values.contiguous().view(batch_size, self.n_, -1)
+        else:
+            inputs = inp
+            values = []
+            for i, agent_value in enumerate(self.value_dicts):
+                value, _ = agent_value(inputs[:, i, :], None)
+                values.append(value)
+            values = torch.stack(values, dim=1)
             
-        inputs = inp.contiguous().view(batch_size*self.n_, -1)
-        agent_value = self.value_dicts[0]
-        values, _ = agent_value(inputs, None)
-        values = values.contiguous().view(batch_size, self.n_, -1)
-
         return values
 
     def get_actions(self, state, status, exploration, actions_avail, target=False, last_hid=None):

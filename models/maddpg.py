@@ -24,7 +24,10 @@ class MADDPG(Model):
         else:
             input_shape = (self.obs_dim + self.act_dim) * self.n_
         output_shape = 1
-        self.value_dicts = nn.ModuleList( [ MLPCritic(input_shape, output_shape, self.args) ] )
+        if self.args.shared_params:
+            self.value_dicts = nn.ModuleList( [ MLPCritic(input_shape, output_shape, self.args) ] )
+        else:
+            self.value_dicts = nn.ModuleList( [ MLPCritic(input_shape, output_shape, self.args) for _ in range(self.n_) ] )
 
     def construct_model(self):
         self.construct_value_net()
@@ -43,22 +46,36 @@ class MADDPG(Model):
             agent_ids = torch.eye(self.n_).unsqueeze(0).repeat(batch_size, 1, 1) # shape = (b, n, n)
             agent_ids = cuda_wrapper(agent_ids, self.cuda_)
             obs_reshape = torch.cat( (obs_reshape, agent_ids), dim=-1 ) # shape = (b, n, n*o+n)
-
-        obs_reshape = obs_reshape.contiguous().view( batch_size*self.n_, -1 ) # shape = (b*n, n*o+n)
+        
+        # make up inputs
         act_repeat = act.unsqueeze(1).repeat(1, self.n_, 1, 1) # shape = (b, n, n, a)
+        act_mask_others = agent_ids.unsqueeze(-1) # shape = (b, n, n, 1)
+        act_mask_i = 1. - act_mask_others
+        act_i = act_repeat * act_mask_others
+        act_others = act_repeat * act_mask_i
 
         # detach other agents' actions
-        for bm in act_repeat:
-            for i, nm in enumerate(bm):
-                for j, a in enumerate(nm):
-                    if j != i:
-                        a = a.detach()
+        act_repeat = act_others.detach() + act_i # shape = (b, n, n, a)
 
-        act_reshape = act_repeat.contiguous().view( batch_size*self.n_, -1 ) # shape = (b*n, n*a)
+        if self.args.shared_params:
+            obs_reshape = obs_reshape.contiguous().view( batch_size*self.n_, -1 ) # shape = (b*n, n*o+n)
+            act_reshape = act_repeat.contiguous().view( batch_size*self.n_, -1 ) # shape = (b*n, n*a)
+        else:
+            obs_reshape = obs_reshape.contiguous().view( batch_size, self.n_, -1 ) # shape = (b, n, n*o+n)
+            act_reshape = act_repeat.contiguous().view( batch_size, self.n_, -1 ) # shape = (b, n, n*a)
+
         inputs = torch.cat( (obs_reshape, act_reshape), dim=-1 )
-        agent_value = self.value_dicts[0]
-        values, _ = agent_value(inputs, None)
-        values = values.contiguous().view(batch_size, self.n_, 1)
+
+        if self.args.shared_params:
+            agent_value = self.value_dicts[0]
+            values, _ = agent_value(inputs, None)
+            values = values.contiguous().view(batch_size, self.n_, 1)
+        else:
+            values = []
+            for i, agent_value in enumerate(self.value_dicts):
+                value, _ = agent_value(inputs[:, i, :], None)
+                values.append(value)
+            values = torch.stack(values, dim=1)
 
         return values
 

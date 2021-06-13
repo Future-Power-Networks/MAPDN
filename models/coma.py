@@ -29,7 +29,10 @@ class COMA(Model):
             else:
                 input_shape = (self.n_ + 1) * self.obs_dim + self.n_ * self.act_dim
             output_shape = self.act_dim
-        self.value_dicts = nn.ModuleList( [ MLPCritic(input_shape, output_shape, self.args) ] )
+        if self.args.shared_params:
+            self.value_dicts = nn.ModuleList( [ MLPCritic(input_shape, output_shape, self.args) ] )
+        else:
+            self.value_dicts = nn.ModuleList( [ MLPCritic(input_shape, output_shape, self.args) for _ in range(self.n_) ] )
 
     def construct_model(self):
         self.construct_value_net()
@@ -56,19 +59,23 @@ class COMA(Model):
             agent_ids = torch.eye(self.n_).unsqueeze(0).repeat(inp.size(0), 1, 1) # shape = (b/s*b, n, n)
             agent_ids = cuda_wrapper(agent_ids, self.cuda_)
             inp = torch.cat( (inp, agent_ids), dim=-1 ) # shape = (b/s*b, n, o*n+o+n)
-            inp = inp.contiguous().view( -1, self.obs_dim*(self.n_+1)+self.n_ ) # shape = (b/s*b, o*n+o+n)
+            if self.args.shared_params:
+                inp = inp.contiguous().view( -1, self.obs_dim*(self.n_+1)+self.n_ ) # shape = (b*n/s*b*n, o*n+o+n)
         else:
-            inp = inp.contiguous().view( -1, self.obs_dim*(self.n_+1) ) # shape = (b/s*b, o*n+o)
-
-        agent_value = self.value_dicts[0]
+            if self.args.shared_params:
+                inp = inp.contiguous().view( -1, self.obs_dim*(self.n_+1) ) # shape = (b*n/s*b*n, o*n+o)
 
         if self.args.continuous:
             if gaussian_flag:
-                act = act.contiguous().view(-1, self.n_*self.act_dim)
+                if self.args.shared_params:
+                    act = act.contiguous().view(-1, self.n_*self.act_dim)
                 inputs = torch.cat( (inp, act), dim=-1 )
             else:
                 act_reshape = act.unsqueeze(1).repeat(1, self.n_, 1, 1) # shape = (b, n, n, a)
-                act_reshape = act_reshape.contiguous().view(-1, self.n_*self.act_dim)
+                if self.args.shared_params:
+                    act_reshape = act_reshape.contiguous().view(-1, self.n_*self.act_dim)
+                else:
+                    act_reshape = act_reshape.contiguous().view(batch_size, self.n_, self.n_*self.act_dim) # shape = (b, n, n*a)
                 inputs = torch.cat( (inp, act_reshape), dim=-1 )
         else:
             # other agents' actions
@@ -77,12 +84,23 @@ class COMA(Model):
             agent_mask = cuda_wrapper(agent_mask, self.cuda_)
             agent_mask_complement = 1. - agent_mask
             act_mask_out = agent_mask_complement * act_repeat # shape = (b, n, n, a)
-            act_other = act_mask_out.contiguous().view(-1, self.n_*self.act_dim) # shape = (b*n, n*a)
+            if self.args.shared_params:
+                act_other = act_mask_out.contiguous().view(-1, self.n_*self.act_dim) # shape = (b*n, n*a)
+            else:
+                act_other = act_mask_out.contiguous().view(batch_size, self.n_, self.n_*self.act_dim) # shape = (b, n, n*a)
             inputs = torch.cat( (inp, act_other), dim=-1 )
 
-        values, _ = agent_value(inputs, None)
-        values = values.contiguous().view(batch_size, self.n_, -1)
-
+        if self.args.shared_params:
+            agent_value = self.value_dicts[0]
+            values, _ = agent_value(inputs, None)
+            values = values.contiguous().view(batch_size, self.n_, -1)
+        else:
+            values = []
+            for i, agent_value in enumerate(self.value_dicts):
+                value, _ = agent_value(inputs[:, i, :], None)
+                values.append(value)
+            values = torch.stack(values, dim=1)
+            
         return values
 
     def get_actions(self, state, status, exploration, actions_avail, target=False, last_hid=None):

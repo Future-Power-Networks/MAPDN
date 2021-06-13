@@ -89,33 +89,50 @@ class Model(nn.Module):
             agent_ids = cuda_wrapper(agent_ids, self.cuda_)
             obs = torch.cat( (obs, agent_ids), dim=-1 ) # shape = (b, n, n+o)
 
-        obs = obs.contiguous().view(batch_size*self.n_, -1) # shape = (b*n, n+o/o)
-        agent_policy = self.policy_dicts[0]
-        means, hiddens = agent_policy(obs, last_hid)
-        # hiddens = torch.stack(hiddens, dim=1)
-        means = means.contiguous().view(batch_size, self.n_, -1)
-        hiddens = hiddens.contiguous().view(batch_size, self.n_, -1)
-        log_stds = cuda_wrapper(torch.zeros_like(means), self.cuda_)
+        if self.args.shared_params:
+            # print (f"This is the shape of last_hids: {last_hid.size()}")
+            obs = obs.contiguous().view(batch_size*self.n_, -1) # shape = (b*n, n+o/o)
+            agent_policy = self.policy_dicts[0]
+            means, hiddens = agent_policy(obs, last_hid)
+            # hiddens = torch.stack(hiddens, dim=1)
+            means = means.contiguous().view(batch_size, self.n_, -1)
+            hiddens = hiddens.contiguous().view(batch_size, self.n_, -1)
+            log_stds = cuda_wrapper(torch.zeros_like(means), self.cuda_)
+        else:
+            means = []
+            hiddens = []
+            for i, agent_policy in enumerate(self.policy_dicts):
+                mean, hidden = agent_policy(obs[:, i, :], last_hid[:, i, :])
+                means.append(mean)
+                hiddens.append(hidden)
+            means = torch.stack(means, dim=1)
+            hiddens = torch.stack(hiddens, dim=1)
+            log_stds = cuda_wrapper(torch.zeros_like(means), self.cuda_)
+
         return means, log_stds, hiddens
 
     def value(self, obs, act, last_act=None, last_hid=None):
         raise NotImplementedError()
 
     def construct_policy_net(self):
+        if self.args.agent_id:
+            input_shape = self.obs_dim + self.n_
+        else:
+            input_shape = self.obs_dim
+
         if self.args.agent_type == 'mlp':
             from agents.mlp_agent import MLPAgent
-            if self.args.agent_id:
-                self.policy_dicts = nn.ModuleList([ MLPAgent(self.obs_dim + self.n_, self.args) ])
-            else:
-                self.policy_dicts = nn.ModuleList([ MLPAgent(self.obs_dim, self.args) ])
-        elif self.args.agent_type == 'rnn':     
+            Agent = MLPAgent
+        elif self.args.agent_type == 'rnn':
             from agents.rnn_agent import RNNAgent
-            if self.args.agent_id:
-                self.policy_dicts = nn.ModuleList([ RNNAgent(self.obs_dim + self.n_, self.args) ])
-            else:
-                self.policy_dicts = nn.ModuleList([ RNNAgent(self.obs_dim, self.args) ])
+            Agent = RNNAgent
         else:
             NotImplementedError()
+            
+        if self.args.shared_params:
+            self.policy_dicts = nn.ModuleList([ Agent(input_shape, self.args) ])
+        else:
+            self.policy_dicts = nn.ModuleList([ Agent(input_shape, self.args) for _ in range(self.n_) ])
 
     def construct_value_net(self):
         raise NotImplementedError()

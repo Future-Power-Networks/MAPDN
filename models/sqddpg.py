@@ -18,13 +18,15 @@ class SQDDPG(Model):
         self.sample_size = self.args.sample_size
 
     def construct_value_net(self):
-        # if self.args.agent_id:
-        #     input_shape = (self.obs_dim + self.act_dim) * self.n_ + self.n_
-        # else:
-        #     input_shape = (self.obs_dim + self.act_dim) * self.n_
-        input_shape = (self.obs_dim + self.act_dim) * self.n_
+        if self.args.agent_id:
+            input_shape = (self.obs_dim + self.act_dim) * self.n_ + self.n_
+        else:
+            input_shape = (self.obs_dim + self.act_dim) * self.n_
         output_shape = 1
-        self.value_dicts = nn.ModuleList( [ MLPCritic(input_shape, output_shape, self.args) ] )
+        if self.args.shared_params:
+            self.value_dicts = nn.ModuleList( [ MLPCritic(input_shape, output_shape, self.args) ] )
+        else:
+            self.value_dicts = nn.ModuleList( [ MLPCritic(input_shape, output_shape, self.args) for _ in range(self.n_) ] )
 
     def construct_model(self):
         self.construct_value_net()
@@ -50,9 +52,11 @@ class SQDDPG(Model):
         individual_map = individual_map.unsqueeze(-1) # shape = (b, n_s, n, n, 1)
         act_no_i = act * subcoalition_map_no_i
         act_i = act * individual_map
+
         # detach other agents' actions
         act = act_no_i.detach() + act_i # shape = (b, n_s, n, n, a)
 
+        # make up inputs
         act = act.contiguous().view(batch_size, self.sample_size, self.n_, -1) # shape = (b, n_s, n, n*a)
         obs = obs.unsqueeze(1).unsqueeze(2).expand(batch_size, self.sample_size, self.n_, self.n_, self.obs_dim) # shape = (b, n, o) -> (b, 1, n, o) -> (b, 1, 1, n, o) -> (b, n_s, n, n, o)
         obs = obs.contiguous().view(batch_size, self.sample_size, self.n_, self.n_*self.obs_dim) # shape = (b, n_s, n, n, o) -> (b, n_s, n, n*o)
@@ -61,16 +65,24 @@ class SQDDPG(Model):
         inp = inp.contiguous().view(batch_size*self.sample_size, self.n_, -1) # shape = (b*n_s, n, n*o+n*a)
 
         # add agent id
-        # if self.args.agent_id:
-        #     agent_ids = torch.eye(self.n_).unsqueeze(0).repeat(batch_size*self.sample_size, 1, 1) # shape = (b*n_s, n, n)
-        #     agent_ids = cuda_wrapper(agent_ids, self.cuda_)
-        #     inp = torch.cat( (inp, agent_ids), dim=-1 ) # shape = (b*n_s, n, n*o+n*a+n)
-        inputs = inp.contiguous().view( batch_size*self.sample_size*self.n_, -1 ) # shape = (b*n_s*n, n*o+n*a/n*o+n*a+n)
-
-        agent_value = self.value_dicts[0]
-        values, _ = agent_value(inputs, None)
+        if self.args.agent_id:
+            agent_ids = torch.eye(self.n_).unsqueeze(0).repeat(batch_size*self.sample_size, 1, 1) # shape = (b*n_s, n, n)
+            agent_ids = cuda_wrapper(agent_ids, self.cuda_)
+            inp = torch.cat( (inp, agent_ids), dim=-1 ) # shape = (b*n_s, n, n*o+n*a+n)
+        
+        if self.args.shared_params:
+            inputs = inp.contiguous().view( batch_size*self.sample_size*self.n_, -1 ) # shape = (b*n_s*n, n*o+n*a/n*o+n*a+n)
+            agent_value = self.value_dicts[0]
+            values, _ = agent_value(inputs, None)
+        else:
+            inputs = inp
+            values = []
+            for i, agent_value in enumerate(self.value_dicts):
+                value, _ = agent_value(inputs[:, i, :], None)
+                values.append(value)
+            values = torch.stack(values, dim=1)
         values = values.contiguous().view(batch_size, self.sample_size, self.n_, 1) # shape = (b, n_s, n, 1)
-
+        
         return values
 
     def value(self, obs, act):
@@ -123,8 +135,6 @@ class SQDDPG(Model):
         if self.args.normalize_advantages:
             advantages = batchnorm(advantages)
         policy_loss = - advantages
-        # policy_loss = policy_loss.mean(dim=0)
-        # value_loss = deltas.pow(2).mean(dim=0)
         policy_loss = policy_loss.mean()
         value_loss = deltas.pow(2).mean()
         return policy_loss, value_loss, action_out

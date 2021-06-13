@@ -25,14 +25,20 @@ class IAC(Model):
             else:
                 input_shape = self.obs_dim + self.act_dim
             output_shape = 1
-            self.value_dicts = nn.ModuleList( [ MLPCritic(input_shape, output_shape, self.args) ] )
+            if self.args.shared_params:
+                self.value_dicts = nn.ModuleList( [ MLPCritic(input_shape, output_shape, self.args) ] )
+            else:
+                self.value_dicts = nn.ModuleList( [ MLPCritic(input_shape, output_shape, self.args) for _ in range(self.n_) ] )
         else:
             if self.args.agent_id:
                 input_shape = self.obs_dim + self.n_
             else:
                 input_shape = self.obs_dim
             output_shape = self.act_dim
-            self.value_dicts = nn.ModuleList( [ MLPCritic(input_shape, output_shape, self.args) ] )
+            if self.args.shared_params:
+                self.value_dicts = nn.ModuleList( [ MLPCritic(input_shape, output_shape, self.args) ] )
+            else:
+                self.value_dicts = nn.ModuleList( [ MLPCritic(input_shape, output_shape, self.args) for _ in range(self.n_) ] )
 
     def construct_model(self):
         self.construct_value_net()
@@ -49,15 +55,25 @@ class IAC(Model):
             agent_ids = cuda_wrapper(agent_ids, self.cuda_)
             obs = torch.cat( (obs, agent_ids), dim=-1 ) # shape = (b, n, o+n)
 
-        obs = obs.contiguous().view(batch_size*self.n_, -1) # shape = (b*n, o+n/o)
-        act = act.contiguous().view(batch_size*self.n_, -1) # shape = (b*n, a)
-        agent_value = self.value_dicts[0]
+        if self.args.shared_params:
+            obs = obs.contiguous().view(batch_size*self.n_, -1) # shape = (b*n, o+n/o)
+            act = act.contiguous().view(batch_size*self.n_, -1) # shape = (b*n, a)
+
         if self.args.continuous:
-            inputs = torch.cat([obs, act], dim=1)
+            inputs = torch.cat([obs, act], dim=-1)
         else:
             inputs = obs
-        values, _ = agent_value(inputs, None)
-        values = values.contiguous().view(batch_size, self.n_, -1)
+
+        if self.args.shared_params:
+            agent_value = self.value_dicts[0]
+            values, _ = agent_value(inputs, None)
+            values = values.contiguous().view(batch_size, self.n_, -1)
+        else:
+            values = []
+            for i, agent_value in enumerate(self.value_dicts):
+                value, _ = agent_value(inputs[:, i, :], None)
+                values.append(value)
+            values = torch.stack(values, dim=1)
 
         return values
 
