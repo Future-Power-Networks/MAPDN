@@ -3,7 +3,7 @@ env: "voltage_control"
 env_args:
     "reward_type": "l1" # "l1", "l2", "bowl", "liu", "bump"
     "voltage_weight": 1.0
-    "q_weight": 0.01
+    "q_weight": 0.1
     "line_weight": null
     "dq_dv_weight": null
     "horizon": 1

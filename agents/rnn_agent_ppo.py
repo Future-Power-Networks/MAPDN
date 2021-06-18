@@ -10,6 +10,8 @@ class RNNAgent(nn.Module):
         self.args = args
 
         self.fc1 = nn.Linear(input_shape, args.hid_size)
+        if args.layernorm:
+            self.layernorm = nn.LayerNorm(args.hid_size)
         self.rnn = nn.GRUCell(args.hid_size, args.hid_size)
         self.fc2 = nn.Linear(args.hid_size, args.action_dim)
 
@@ -18,8 +20,12 @@ class RNNAgent(nn.Module):
         return self.fc1.weight.new(1, self.args.agent_num, self.args.hid_size).zero_()
 
     def forward(self, inputs, hidden_state):
-        x = th.tanh(self.fc1(inputs))
+        x = self.fc1(inputs)
+        if self.args.layernorm:
+            x = self.layernorm(x)
+        x = th.tanh(x)
         h_in = hidden_state.reshape(-1, self.args.hid_size)
         h = self.rnn(x, h_in)
         a = self.fc2(h)
+        # a = th.tanh(self.fc2(h))
         return a, h

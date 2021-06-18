@@ -14,13 +14,15 @@
 "target": True
 "target_lr": 0.1
 "entr": 1.0e-3
-"max_steps": 200
+"max_steps": 100
 "batch_size": 32 # transition update: steps / episodic update: episodes
 "replay": True
-"replay_buffer_size": 1.0e+4
+"replay_buffer_size": 5.0e+3
 "agent_type": "rnn" # rnn/mlp
-"agent_id": True
+"agent_id": False
 "shared_params": False # agent_id can be switched off
+"layernorm": True # add layernorm on the first layer over inputs
+"action_enforcebound": True
 "gamma": 0.99
 "hid_size": 64
 "continuous": True
@@ -30,7 +32,7 @@
 "train_episodes_num": 400
 "behaviour_update_freq": 25 # transition update: steps / episodic update: episodes
 "policy_update_epochs": 1
-"value_update_epochs": 10
+"value_update_epochs": 5
 "target_update_freq": 50 # transition update: steps / episodic update: episodes
 "reward_normalisation": True
-"eval_freq": 10 # evaluation per xxx episodes
+"eval_freq": 20 # evaluation per xxx episodes

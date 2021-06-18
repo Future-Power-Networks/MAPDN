@@ -34,12 +34,10 @@ class GumbelSoftmax(OneHotCategorical):
         return self.hard_gumbel_softmax_sample()
 
 def normal_entropy(mean, std):
-    # return Normal(mean, std).entropy().sum()
     return Normal(mean, std).entropy().mean()
 
 def multinomial_entropy(logits):
     assert logits.size(-1) > 1
-    # return GumbelSoftmax(logits=logits).entropy().sum()
     return GumbelSoftmax(logits=logits).entropy().mean()
 
 def normal_log_density(actions, means, log_stds):
@@ -65,10 +63,12 @@ def select_action(args, logits, status='train', exploration=True, info={}):
                     normal = Normal(act_mean, act_std)
                     x_t = normal.rsample()
                     y_t = torch.tanh(x_t)
-                    actions = y_t * args.action_scale + args.action_bias
+                    # actions = y_t * args.action_scale + args.action_bias
+                    actions = y_t
                     log_prob = normal.log_prob(x_t)
                     # Enforcing Action Bound
-                    log_prob -= torch.log(args.action_scale * (1 - y_t.pow(2)) +  1e-6)
+                    # log_prob -= torch.log(1 - y_t.pow(2) +  1e-12) + torch.log(args.action_scale)
+                    log_prob -= torch.log(1 - y_t.pow(2) +  1e-12)
                     return actions, log_prob
                 else:
                     normal = Normal(act_mean, act_std)
@@ -79,7 +79,13 @@ def select_action(args, logits, status='train', exploration=True, info={}):
             else:
                 return act_mean, None
         elif status == 'test':
-            return act_mean, None
+            if args.action_enforcebound:
+                x_t = act_mean
+                actions = torch.tanh(x_t)
+                return actions, None
+            else:
+                actions = act_mean
+                return actions, None
     else:
         if status == 'train':
             if exploration:
@@ -119,12 +125,15 @@ def translate_action(args, action, env):
     if args.continuous:
         actions = action.detach().squeeze().cpu().numpy()
         cp_actions = actions.copy()
-        # clip and scale action to correct range
-        low = env.action_space.low
-        high = env.action_space.high
+        # clip and scale action to correct range for safety
+        # low = env.action_space.low
+        # high = env.action_space.high
+        low = -args.action_scale
+        high = args.action_scale
         for i in range(len(cp_actions)):
             cp_actions[i] = max(-1.0, min(cp_actions[i], 1.0))
             cp_actions[i] = 0.5 * (cp_actions[i] + 1.0) * (high - low) + low
+            cp_actions[i] = cp_actions[i] + args.action_bias
         return actions, cp_actions
     else:
         actual = [act.detach().squeeze().cpu().numpy() for act in torch.unbind(action, 1)]

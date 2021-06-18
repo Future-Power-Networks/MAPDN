@@ -97,7 +97,7 @@ class SQDDPG(Model):
             else:
                 means_ = means
                 log_stds_ = log_stds
-            actions, log_prob_a = select_action(self.args, means_, status=status, exploration=exploration, info={'log_std': log_stds_})
+            actions, log_prob_a = select_action(self.args, means_, status=status, exploration=exploration, info={'enforcing_action_bound': self.args.action_enforcebound, 'log_std': log_stds_})
             restore_mask = 1. - cuda_wrapper((actions_avail == 0).float(), self.cuda_)
             restore_actions = restore_mask * actions
             action_out = (means, log_stds)

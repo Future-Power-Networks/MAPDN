@@ -10,6 +10,8 @@ class RNNCritic(nn.Module):
         self.args = args
 
         self.fc1 = nn.Linear(input_shape, args.hid_size)
+        if args.layernorm:
+            self.layernorm = nn.LayerNorm(args.hid_size)
         self.rnn = nn.GRUCell(args.hid_size, args.hid_size)
         self.fc2 = nn.Linear(args.hid_size, output_shape)
 
@@ -18,7 +20,10 @@ class RNNCritic(nn.Module):
         return self.fc1.weight.new(1, self.args.hid_size).zero_()
 
     def forward(self, inputs, hidden_state):
-        x = F.relu(self.fc1(inputs))
+        x = self.fc1(inputs)
+        if self.args.layernorm:
+            x = self.layernorm(x)
+        x = F.relu()
         h_in = hidden_state.reshape(-1, self.args.hid_size)
         h = self.rnn(x, h_in)
         v = self.fc2(h)

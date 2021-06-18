@@ -86,7 +86,7 @@ class IAC(Model):
             else:
                 means_ = means
                 log_stds_ = log_stds
-            actions, log_prob_a = select_action(self.args, means_, status=status, exploration=exploration, info={'log_std': log_stds_})
+            actions, log_prob_a = select_action(self.args, means_, status=status, exploration=exploration, info={'enforcing_action_bound': self.args.action_enforcebound, 'log_std': log_stds_})
             restore_mask = 1. - cuda_wrapper((actions_avail == 0).float(), self.cuda_)
             # log_prob_a = (restore_mask * log_prob_a).sum(dim=-1)
             restore_actions = restore_mask * actions

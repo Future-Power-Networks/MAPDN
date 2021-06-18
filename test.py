@@ -83,13 +83,17 @@ with open("./args/default.yaml", "r") as f:
 # load alg args
 with open("./args/alg_args/"+argv.alg+".yaml", "r") as f:
     alg_config_dict = yaml.safe_load(f)["alg_args"]
-    if "action_scale" in alg_config_dict.keys():
-        alg_config_dict["action_scale"] = env_config_dict["action_scale"]
-    if "action_bias" in alg_config_dict.keys():
-        alg_config_dict["action_bias"] = env_config_dict["action_bias"]
+    # if "action_scale" in alg_config_dict.keys():
+    #     alg_config_dict["action_scale"] = env_config_dict["action_scale"]
+    # if "action_bias" in alg_config_dict.keys():
+    #     alg_config_dict["action_bias"] = env_config_dict["action_bias"]
 
 log_name = "-".join([argv.env, net_topology, argv.difficulty, argv.mode, argv.alg, argv.reward_type, argv.alias])
 alg_config_dict = {**default_config_dict, **alg_config_dict}
+
+if alg_config_dict["action_enforcebound"]:
+    alg_config_dict["action_scale"] = env_config_dict["action_scale"]
+    alg_config_dict["action_bias"] = env_config_dict["action_bias"]
 
 # define envs
 env = VoltageControl(env_config_dict)
@@ -130,8 +134,8 @@ else:
     raise RuntimeError("Please input the correct strategy, e.g. pg or q.")
 
 if argv.test_mode == 'single':
-    record = test.run(199, 23, 2) # (day, hour, quarter)
-    # record = test.run(730, 23, 2) # (day, hour, quarter)
+    # record = test.run(199, 23, 2) # (day, hour, quarter)
+    record = test.run(730, 23, 2) # (day, hour, quarter)
 elif argv.test_mode == 'batch':
     record = test.batch_run(10)
 

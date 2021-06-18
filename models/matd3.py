@@ -41,9 +41,9 @@ class MATD3(Model):
         obs_reshape = obs_repeat.contiguous().view(batch_size, self.n_, -1) # shape = (b, n, n*o)
 
         # add agent id
+        agent_ids = torch.eye(self.n_).unsqueeze(0).repeat(batch_size, 1, 1) # shape = (b, n, n)
+        agent_ids = cuda_wrapper(agent_ids, self.cuda_)
         if self.args.agent_id:
-            agent_ids = torch.eye(self.n_).unsqueeze(0).repeat(batch_size, 1, 1) # shape = (b, n, n)
-            agent_ids = cuda_wrapper(agent_ids, self.cuda_)
             obs_reshape = torch.cat( (obs_reshape, agent_ids), dim=-1 ) # shape = (b, n, n*o+n)
 
         act_repeat = act.unsqueeze(1).repeat(1, self.n_, 1, 1) # shape = (b, n, n, a)
@@ -97,7 +97,10 @@ class MATD3(Model):
             else:
                 means_ = means
                 log_stds_ = log_stds
-            actions, log_prob_a = select_action(self.args, means_, status=status, exploration=exploration, info={'log_std': log_stds_, 'clip': True if target else False})
+            if self.args.action_enforcebound:
+                actions, log_prob_a = select_action(self.args, means_, status=status, exploration=exploration, info={'enforcing_action_bound': self.args.action_enforcebound, 'log_std': log_stds_})
+            else:
+                actions, log_prob_a = select_action(self.args, means_, status=status, exploration=exploration, info={'clip': target, 'log_std': log_stds_})
             restore_mask = 1. - cuda_wrapper((actions_avail == 0).float(), self.cuda_)
             restore_actions = restore_mask * actions
             action_out = (means, log_stds)
@@ -114,7 +117,7 @@ class MATD3(Model):
         batch_size = len(batch.state)
         state, actions, old_log_prob_a, old_values, old_next_values, rewards, next_state, done, last_step, actions_avail, last_hids, hids = self.unpack_data(batch)
         _, actions_pol, log_prob_a, action_out, _ = self.get_actions(state, status='train', exploration=False, actions_avail=actions_avail, target=False, last_hid=last_hids)
-        _, next_actions, _, _, _ = self.get_actions(next_state, status='train', exploration=True, actions_avail=actions_avail, target=self.args.target, last_hid=hids)
+        _, next_actions, _, _, _ = self.get_actions(next_state, status='train', exploration=True, actions_avail=actions_avail, target=True, last_hid=hids)
         compose_pol = self.value(state, actions_pol)
         values_pol = compose_pol[:batch_size, :]
         values_pol = values_pol.contiguous().view(-1, self.n_)

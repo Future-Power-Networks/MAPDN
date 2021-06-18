@@ -9,5 +9,4 @@ alg_args:
     "reward_scale": 100
     "LOG_STD_MIN": 0.0
     "LOG_STD_MAX": 0.5
-    "action_scale": None
-    "action_bias": None
+    "action_enforcebound": True

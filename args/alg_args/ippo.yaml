@@ -3,8 +3,8 @@ alg: "ippo"
 alg_args:
     "policy_lrate": 1.0e-4
     "value_lrate": 1.0e-4
-    "value_update_epochs": 5
-    "policy_update_epochs": 5
+    "value_update_epochs": 10
+    "policy_update_epochs": 10
     "lambda_": 0.95
     "eps_clip": 0.5
     "value_loss_coef": 2.

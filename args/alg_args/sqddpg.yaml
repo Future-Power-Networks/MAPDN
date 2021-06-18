@@ -2,5 +2,5 @@ alg: "sqddpg"
 
 alg_args:
     "policy_lrate": 1.0e-4
-    "value_lrate": 1.0e-3
+    "value_lrate": 1.0e-4
     "sample_size": 10

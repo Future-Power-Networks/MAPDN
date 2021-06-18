@@ -22,4 +22,5 @@ class MLPAgent(nn.Module):
         x = th.tanh(self.fc1(inputs))
         h = th.tanh(self.fc2(x))
         a = self.fc3(h)
+        # a = th.tanh(self.fc3(h))
         return a, h

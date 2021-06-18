@@ -108,7 +108,7 @@ class MAAC(Model):
                 means_ = means
                 log_stds_ = log_stds
             # this follows the original version of sac: sampling actions
-            actions, log_prob_a = select_action(self.args, means_, status=status, exploration=exploration, info={'enforcing_action_bound': True, 'log_std': log_stds_})
+            actions, log_prob_a = select_action(self.args, means_, status=status, exploration=exploration, info={'enforcing_action_bound': self.args.action_enforcebound, 'log_std': log_stds_})
             restore_mask = 1. - cuda_wrapper((actions_avail == 0).float(), self.cuda_)
             if log_prob_a != None:
                 log_prob_a = (restore_mask * log_prob_a).sum(dim=-1)
