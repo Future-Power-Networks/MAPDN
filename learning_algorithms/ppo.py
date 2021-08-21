@@ -1,11 +1,14 @@
 from learning_algorithms.rl_algorithms import ReinforcementLearning
 from utilities.util import select_action, cuda_wrapper, batchnorm, normal_log_density, multinomials_log_density
-import torch
+import torch as th
+import torch.nn as nn
+
 
 
 class PPO(ReinforcementLearning):
     def __init__(self, args):
         super(PPO, self).__init__('PPO', args)
+        self.batchnorm = nn.BatchNorm1d(self.args.agent_num).to(self.device)
 
     def __call__(self, batch, behaviour_net, target_net):
         return self.get_loss(batch, behaviour_net, target_net)
@@ -25,7 +28,7 @@ class PPO(ReinforcementLearning):
                 log_stds_ = log_stds
             action_out = (means, log_stds)
             log_prob_a = normal_log_density(actions, means_, log_stds_)
-            restore_mask = 1. - cuda_wrapper((actions_avail == 0).float(), self.cuda_)
+            restore_mask = 1. - (actions_avail == 0).to(self.device).float()
             log_prob_a = (restore_mask * log_prob_a).sum(dim=-1)
             old_log_prob_a = (restore_mask * old_log_prob_a).sum(dim=-1)
         else:
@@ -33,11 +36,11 @@ class PPO(ReinforcementLearning):
             logits[actions_avail == 0] = -9999999
             action_out = logits
             log_prob_a = multinomials_log_density(actions, logits)
-        ratios = torch.exp(log_prob_a.squeeze(-1) - old_log_prob_a.squeeze(-1).detach())
+        ratios = th.exp(log_prob_a.squeeze(-1) - old_log_prob_a.squeeze(-1).detach())
         values = behaviour_net.value(state, None).contiguous().view(-1, behaviour_net.n_)
         next_values = behaviour_net.value(next_state, None).contiguous().view(-1, behaviour_net.n_)
-        advantages = cuda_wrapper(torch.zeros((batch_size, behaviour_net.n_), dtype=torch.float), behaviour_net.cuda_)
-        returns = cuda_wrapper(torch.zeros((batch_size, behaviour_net.n_), dtype=torch.float), behaviour_net.cuda_)
+        advantages = th.zeros( (batch_size, behaviour_net.n_), dtype=th.float ).to(self.device)
+        returns = th.zeros( (batch_size, behaviour_net.n_), dtype=th.float ).to(self.device)
         assert advantages.size() == values.size() == returns.size()
         # GAE -> advantage
         last_advantages = 0
@@ -57,18 +60,16 @@ class PPO(ReinforcementLearning):
             next_return = returns[i]
         # normalise advantage
         if behaviour_net.args.normalize_advantages:
-            advantages = batchnorm(advantages)
+            advantages = self.batchnorm(advantages)
         # policy loss
         assert ratios.size() == advantages.size()
         surr1 = ratios * advantages.detach()
-        surr2 = torch.clamp(ratios, 1 - behaviour_net.args.eps_clip, 1 + behaviour_net.args.eps_clip) * advantages.detach()
-        # policy_loss = - torch.min(surr1, surr2).mean(dim=0)
-        policy_loss = - torch.min(surr1, surr2).mean()
+        surr2 = th.clamp(ratios, 1 - behaviour_net.args.eps_clip, 1 + behaviour_net.args.eps_clip) * advantages.detach()
+        policy_loss = - th.min(surr1, surr2).mean()
         # value loss
         assert old_values.size() == values.size()
-        values_clipped = old_values + torch.clamp(values - old_values, - behaviour_net.args.eps_clip, behaviour_net.args.eps_clip)
+        values_clipped = old_values + th.clamp(values - old_values, - behaviour_net.args.eps_clip, behaviour_net.args.eps_clip)
         surr1 = (values - returns).pow(2)
         surr2 = (values_clipped - returns).pow(2)
-        # value_loss = self.args.value_loss_coef * torch.max(surr1, surr2).mean(dim=0)
-        value_loss = self.args.value_loss_coef * torch.max(surr1, surr2).mean()
+        value_loss = self.args.value_loss_coef * th.max(surr1, surr2).mean()
         return policy_loss, value_loss, action_out

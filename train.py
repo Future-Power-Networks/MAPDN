@@ -1,4 +1,4 @@
-import torch
+import torch as th
 import os
 import argparse
 from collections import namedtuple
@@ -7,9 +7,10 @@ import yaml
 
 from registry import Model, Strategy
 from environments.var_voltage_control.voltage_control_env import VoltageControl
-from utilities.util import convert
+from utilities.util import convert, dict2str
 from utilities.trainer import PGTrainer
 from tensorboardX import SummaryWriter
+
 
 
 parser = argparse.ArgumentParser(description="Train rl agent.")
@@ -30,43 +31,41 @@ data_path = env_config_dict["data_path"].split("/")
 data_path[-1] = argv.scenario
 env_config_dict["data_path"] = "/".join(data_path)
 net_topology = argv.scenario
-assert net_topology in ['bus33bw_gu', 'bus141_gu', 'bus322_gu'], f'{net_topology} is not a valid scenario.'
+assert net_topology in ['bus33bw_gu', 'bus141_gu', 'bus322_gu', 'bus33bw_gu_3min', 'bus141_gu_3min', 'bus322_gu_3min'], f'{net_topology} is not a valid scenario.'
 if argv.difficulty == "easy":
     env_config_dict["pv_scale"] = 0.5
     env_config_dict["demand_scale"] = 1.0
-    if argv.scenario == 'bus33bw_gu':
+    if argv.scenario in ['bus33bw_gu', 'bus33bw_gu_3min']:
         env_config_dict["action_bias"] = 0.0
         env_config_dict["action_scale"] = 0.7
-    elif argv.scenario == 'bus141_gu':
+    elif argv.scenario in ['bus141_gu', 'bus141_gu_3min']:
         env_config_dict["action_bias"] = 0.0
         env_config_dict["action_scale"] = 0.8
-    elif argv.scenario == 'bus322_gu':
+    elif argv.scenario in ['bus322_gu', 'bus322_gu_3min']:
         env_config_dict["action_bias"] = 0.0
         env_config_dict["action_scale"] = 0.5
 elif argv.difficulty == "hard":
     env_config_dict["pv_scale"] = 0.8
     env_config_dict["demand_scale"] = 1.0
-    if argv.scenario == 'bus33bw_gu':
+    if argv.scenario in ['bus33bw_gu', 'bus33bw_gu_3min']:
         env_config_dict["action_bias"] = 0.0
         env_config_dict["action_scale"] = 0.7
-    elif argv.scenario == 'bus141_gu':
+    elif argv.scenario in ['bus141_gu', 'bus141_gu_3min']:
         env_config_dict["action_bias"] = 0.0
         env_config_dict["action_scale"] = 0.8
-    elif argv.scenario == 'bus322_gu':
+    elif argv.scenario in ['bus322_gu', 'bus322_gu_3min']:
         env_config_dict["action_bias"] = 0.0
         env_config_dict["action_scale"] = 0.4
 elif argv.difficulty == "super_hard":
-    env_config_dict["pv_scale"] = 1.0
-    env_config_dict["demand_scale"] = 1.0
-    # env_config_dict["action_bias"] = 0.0
-    # env_config_dict["action_scale"] = 1.0
-    if argv.scenario == 'bus33bw_gu':
+    env_config_dict["pv_scale"] = 1.0 * 0.3
+    env_config_dict["demand_scale"] = 1.0 * 0.3
+    if argv.scenario in ['bus33bw_gu', 'bus33bw_gu_3min']:
         env_config_dict["action_bias"] = 0.0
         env_config_dict["action_scale"] = 0.5
-    elif argv.scenario == 'bus141_gu':
+    elif argv.scenario in ['bus141_gu', 'bus141_gu_3min']:
         env_config_dict["action_bias"] = 0.0
         env_config_dict["action_scale"] = 0.6
-    elif argv.scenario == 'bus322_gu':
+    elif argv.scenario in ['bus322_gu', 'bus322_gu_3min']:
         env_config_dict["action_bias"] = 0.0
         env_config_dict["action_scale"] = 0.3
 else:
@@ -82,17 +81,11 @@ with open("./args/default.yaml", "r") as f:
 # load alg args
 with open("./args/alg_args/" + argv.alg + ".yaml", "r") as f:
     alg_config_dict = yaml.safe_load(f)["alg_args"]
-    # if "action_scale" in alg_config_dict.keys():
-    #     alg_config_dict["action_scale"] = env_config_dict["action_scale"]
-    # if "action_bias" in alg_config_dict.keys():
-    #     alg_config_dict["action_bias"] = env_config_dict["action_bias"]
+    alg_config_dict["action_scale"] = env_config_dict["action_scale"]
+    alg_config_dict["action_bias"] = env_config_dict["action_bias"]
 
 log_name = "-".join([argv.env, net_topology, argv.difficulty, argv.mode, argv.alg, argv.reward_type, argv.alias])
 alg_config_dict = {**default_config_dict, **alg_config_dict}
-
-if alg_config_dict["action_enforcebound"]:
-    alg_config_dict["action_scale"] = env_config_dict["action_scale"]
-    alg_config_dict["action_bias"] = env_config_dict["action_bias"]
 
 # define envs
 env = VoltageControl(env_config_dict)
@@ -100,7 +93,6 @@ env = VoltageControl(env_config_dict)
 alg_config_dict["agent_num"] = env.get_num_of_agents()
 alg_config_dict["obs_size"] = env.get_obs_size()
 alg_config_dict["action_dim"] = env.get_total_actions()
-# alg_config_dict["obs_hist_len"] = env_config_dict["forecast_horizon"]
 args = convert(alg_config_dict)
 
 # define the save path
@@ -142,8 +134,10 @@ else:
     raise RuntimeError("Please input the correct strategy, e.g. pg or q.")
 
 with open(save_path + "tensorboard/" + log_name + "/log.txt", "w+") as file:
-    file.write(str(args) + "\n")
-    file.write(str(env_config_dict) + "\n")
+    alg_args2str = dict2str(alg_config_dict, 'alg_params')
+    env_args2str = dict2str(env_config_dict, 'env_params')
+    file.write(alg_args2str + "\n")
+    file.write(env_args2str + "\n")
 
 for i in range(args.train_episodes_num):
     stat = {}
@@ -151,7 +145,7 @@ for i in range(args.train_episodes_num):
     train.logging(stat)
     if i%args.save_model_freq == args.save_model_freq-1:
         train.print_info(stat)
-        torch.save({"model_state_dict": train.behaviour_net.state_dict()}, save_path + "model_save/" + log_name + "/model.pt")
+        th.save({"model_state_dict": train.behaviour_net.state_dict()}, save_path + "model_save/" + log_name + "/model.pt")
         print ("The model is saved!\n")
 
 logger.close()

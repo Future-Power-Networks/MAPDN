@@ -1,9 +1,6 @@
-import torch
-import torch.nn as nn
+import torch as th
 import numpy as np
-from utilities.util import *
 from models.model import Model
-from learning_algorithms.ddpg import *
 from collections import namedtuple
 
 
@@ -15,7 +12,8 @@ class RandomAgent(Model):
         self.args = args
 
     def policy(self, obs, schedule=None, last_act=None, last_hid=None, info={}, stat={}):
-        actions = []
-        tensor = torch.cuda.FloatTensor if self.args.cuda else torch.FloatTensor
-        actions = tensor([[1.0]*self.act_dim]*self.n_)
-        return actions
+        # obs_shape = (b, n, o)
+        batch_size = obs.size(0)
+        means = th.randn(batch_size, self.n_, self.act_dim).to(self.device)
+        log_stds = th.zeros_like(means).to(self.device)
+        return means, log_stds, None

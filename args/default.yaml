@@ -5,34 +5,47 @@
 # if set batch_size / update_freq <= replay_buffer_size and episodic=False -> off-policy transition update
 "gumbel_softmax": False
 "epsilon_softmax": False
+"softmax_eps": null
 "episodic": False
 "cuda": True
-"grad_clip": True
 "grad_clip_eps": 1.0 # activated when grad_clip=True
-"save_model_freq": 20
+"save_model_freq": 40 # episode
 "replay_warmup": 0
+"policy_lrate": null
+"value_lrate": null
+"mixer_lrate": null
 "target": True
 "target_lr": 0.1
 "entr": 1.0e-3
-"max_steps": 100
+"max_steps": 240
 "batch_size": 32 # transition update: steps / episodic update: episodes
 "replay": True
 "replay_buffer_size": 5.0e+3
 "agent_type": "rnn" # rnn/mlp
-"agent_id": False
-"shared_params": False # agent_id can be switched off
+"agent_id": True
+"shared_params": True # agent_id can be switched off if False
 "layernorm": True # add layernorm on the first layer over inputs
+"mixer": False
+"gaussian_policy": True
+"LOG_STD_MIN": 0.0 # activated only if gaussian_policy is True
+"LOG_STD_MAX": 0.5
+"fixed_policy_std": 1.0 # activated if gaussian policy is False, for exploration
+"hid_activation": "relu" # tanh/relu
+"init_type": "normal" # normal/orthogonal
+"init_std": 0.1
 "action_enforcebound": True
+"double_q": True
+"clip_c": 1.0
 "gamma": 0.99
 "hid_size": 64
-"continuous": True
-"init_type": "normal"
-"init_std": 0.1
+"continuous": True # if the control variable is continuous
 "normalize_advantages": False
 "train_episodes_num": 400
-"behaviour_update_freq": 25 # transition update: steps / episodic update: episodes
+"behaviour_update_freq": 60 # transition update: steps / episodic update: episodes
+"target_update_freq": 120 # transition update: steps / episodic update: episodes
 "policy_update_epochs": 1
-"value_update_epochs": 5
-"target_update_freq": 50 # transition update: steps / episodic update: episodes
+"value_update_epochs": 10
+"mixer_update_epochs": null
 "reward_normalisation": True
 "eval_freq": 20 # evaluation per xxx episodes
+"num_eval_episodes": 10 # number of episodes for an evaluation

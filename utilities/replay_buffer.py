@@ -1,6 +1,7 @@
 import numpy as np
 
 
+
 class TransReplayBuffer(object):
     def __init__(self, size):
         self.size = size

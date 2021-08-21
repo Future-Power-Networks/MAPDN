@@ -1,4 +1,4 @@
-import torch
+import torch as th
 import torch.nn as nn
 import numpy as np
 from utilities.util import select_action, cuda_wrapper, batchnorm
@@ -6,6 +6,7 @@ from models.model import Model
 from learning_algorithms.ddpg import DDPG
 from collections import namedtuple
 from critics.mlp_critic import MLPCritic
+
 
 
 class MATD3(Model):
@@ -16,6 +17,7 @@ class MATD3(Model):
         if target_net != None:
             self.target_net = target_net
             self.reload_params_to_target()
+        self.batchnorm = nn.BatchNorm1d(self.args.agent_num).to(self.device)
 
     def construct_value_net(self):
         if self.args.agent_id:
@@ -41,10 +43,9 @@ class MATD3(Model):
         obs_reshape = obs_repeat.contiguous().view(batch_size, self.n_, -1) # shape = (b, n, n*o)
 
         # add agent id
-        agent_ids = torch.eye(self.n_).unsqueeze(0).repeat(batch_size, 1, 1) # shape = (b, n, n)
-        agent_ids = cuda_wrapper(agent_ids, self.cuda_)
+        agent_ids = th.eye(self.n_).unsqueeze(0).repeat(batch_size, 1, 1).to(self.device) # shape = (b, n, n)
         if self.args.agent_id:
-            obs_reshape = torch.cat( (obs_reshape, agent_ids), dim=-1 ) # shape = (b, n, n*o+n)
+            obs_reshape = th.cat( (obs_reshape, agent_ids), dim=-1 ) # shape = (b, n, n*o+n)
 
         act_repeat = act.unsqueeze(1).repeat(1, self.n_, 1, 1) # shape = (b, n, n, a)
         act_mask_others = agent_ids.unsqueeze(-1) # shape = (b, n, n, 1)
@@ -62,11 +63,11 @@ class MATD3(Model):
             obs_reshape = obs_reshape.contiguous().view( batch_size, self.n_, -1 ) # shape = (b, n, n*o+n/n*o)
             act_reshape = act_repeat.contiguous().view( batch_size, self.n_, -1 ) # shape = (b, n, n*a)
 
-        inputs = torch.cat( (obs_reshape, act_reshape), dim=-1 )
-        ones = cuda_wrapper( torch.ones( inputs.size()[:-1] + (1,), dtype=torch.float ), self.cuda_)
-        zeros = cuda_wrapper( torch.zeros( inputs.size()[:-1] + (1,), dtype=torch.float ), self.cuda_)
-        inputs1 = torch.cat( (inputs, zeros), dim=-1 )
-        inputs2 = torch.cat( (inputs, ones), dim=-1 )
+        inputs = th.cat( (obs_reshape, act_reshape), dim=-1 )
+        ones = th.ones( inputs.size()[:-1] + (1,), dtype=th.float ).to(self.device)
+        zeros = th.zeros( inputs.size()[:-1] + (1,), dtype=th.float ).to(self.device)
+        inputs1 = th.cat( (inputs, zeros), dim=-1 )
+        inputs2 = th.cat( (inputs, ones), dim=-1 )
 
         if self.args.shared_params:
             agent_value = self.value_dicts[0]
@@ -81,14 +82,15 @@ class MATD3(Model):
                 values_2, _ = agent_value(inputs2[:, i, :], None)
                 values1.append(values_1)
                 values2.append(values_2)
-            values1 = torch.stack(values1, dim=1)
-            values2 = torch.stack(values2, dim=1)
+            values1 = th.stack(values1, dim=1)
+            values2 = th.stack(values2, dim=1)
 
-        return torch.cat([values1, values2], dim=0)
+        return th.cat([values1, values2], dim=0)
 
     def get_actions(self, state, status, exploration, actions_avail, target=False, last_hid=None):
+        target_policy = self.target_net.policy if self.args.target else self.policy
         if self.args.continuous:
-            means, log_stds, hiddens = self.policy(state, last_hid=last_hid) if not target else self.target_net.policy(state, last_hid=last_hid)
+            means, log_stds, hiddens = self.policy(state, last_hid=last_hid) if not target else target_policy(state, last_hid=last_hid)
             means[actions_avail == 0] = 0.0
             log_stds[actions_avail == 0] = 0.0
             if means.size(-1) > 1:
@@ -97,15 +99,12 @@ class MATD3(Model):
             else:
                 means_ = means
                 log_stds_ = log_stds
-            if self.args.action_enforcebound:
-                actions, log_prob_a = select_action(self.args, means_, status=status, exploration=exploration, info={'enforcing_action_bound': self.args.action_enforcebound, 'log_std': log_stds_})
-            else:
-                actions, log_prob_a = select_action(self.args, means_, status=status, exploration=exploration, info={'clip': target, 'log_std': log_stds_})
-            restore_mask = 1. - cuda_wrapper((actions_avail == 0).float(), self.cuda_)
+            actions, log_prob_a = select_action(self.args, means_, status=status, exploration=exploration, info={'clip': target, 'log_std': log_stds_})
+            restore_mask = 1. - (actions_avail == 0).to(self.device).float()
             restore_actions = restore_mask * actions
             action_out = (means, log_stds)
         else:
-            logits, _, hiddens = self.policy(state, last_hid=last_hid) if not target else self.target_net.policy(state, last_hid=last_hid)
+            logits, _, hiddens = self.policy(state, last_hid=last_hid) if not target else target_policy(state, last_hid=last_hid)
             logits[actions_avail == 0] = -9999999
             # this follows the original version of sac: sampling actions
             actions, log_prob_a = select_action(self.args, logits, status=status, exploration=exploration)
@@ -117,7 +116,11 @@ class MATD3(Model):
         batch_size = len(batch.state)
         state, actions, old_log_prob_a, old_values, old_next_values, rewards, next_state, done, last_step, actions_avail, last_hids, hids = self.unpack_data(batch)
         _, actions_pol, log_prob_a, action_out, _ = self.get_actions(state, status='train', exploration=False, actions_avail=actions_avail, target=False, last_hid=last_hids)
-        _, next_actions, _, _, _ = self.get_actions(next_state, status='train', exploration=True, actions_avail=actions_avail, target=True, last_hid=hids)
+        # _, next_actions, _, _, _ = self.get_actions(next_state, status='train', exploration=True, actions_avail=actions_avail, target=True, last_hid=hids)
+        if self.args.double_q:
+            _, next_actions, _, _, _ = self.get_actions(next_state, status='train', exploration=True, actions_avail=actions_avail, target=False, last_hid=hids)
+        else:
+            _, next_actions, _, _, _ = self.get_actions(next_state, status='train', exploration=True, actions_avail=actions_avail, target=True, last_hid=hids)
         compose_pol = self.value(state, actions_pol)
         values_pol = compose_pol[:batch_size, :]
         values_pol = values_pol.contiguous().view(-1, self.n_)
@@ -129,24 +132,22 @@ class MATD3(Model):
         next_values1, next_values2 = next_compose[:batch_size, :], next_compose[batch_size:, :]
         next_values1 = next_values1.contiguous().view(-1, self.n_)
         next_values2 = next_values2.contiguous().view(-1, self.n_)
-        returns = cuda_wrapper(torch.zeros((batch_size, self.n_), dtype=torch.float), self.cuda_)
+        returns = th.zeros((batch_size, self.n_), dtype=th.float).to(self.device)
         assert values_pol.size() == next_values1.size() == next_values2.size()
         assert returns.size() == values1.size() == values2.size()
         # update twin values by the minimized target q
         for i in reversed(range(rewards.size(0))):
             if last_step[i]:
-                next_return = 0 if done[i] else torch.minimum(next_values1[i].detach(), next_values2[i].detach())
+                next_return = 0 if done[i] else th.minimum(next_values1[i].detach(), next_values2[i].detach())
             else:
-                next_return = torch.minimum(next_values1[i].detach(), next_values2[i].detach())
+                next_return = th.minimum(next_values1[i].detach(), next_values2[i].detach())
             returns[i] = rewards[i] + self.args.gamma * next_return
         deltas1 = returns - values1
         deltas2 = returns - values2
         advantages = values_pol
         if self.args.normalize_advantages:
-            advantages = batchnorm(advantages)
+            advantages = self.batchnorm(advantages)
         policy_loss = - advantages
-        # policy_loss = policy_loss.mean(dim=0)
-        # value_loss = torch.cat((deltas1.pow(2).mean(dim=0), deltas2.pow(2).mean(dim=0)), dim=-1)
         policy_loss = policy_loss.mean()
         value_loss = 0.5 * ( deltas1.pow(2).mean() + deltas2.pow(2).mean() )
         return policy_loss, value_loss, action_out

@@ -3,4 +3,5 @@ alg: "matd3"
 alg_args:
     "policy_lrate": 1.0e-4
     "value_lrate": 1.0e-4
-    "c": 1.0
+    "gaussian_policy": False
+    "action_enforcebound": True

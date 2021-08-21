@@ -68,7 +68,6 @@ class VoltageControl(MultiAgentEnv):
         agents_obs, state = self.reset()
 
         self.obs_size = agents_obs[0].shape[0]
-        # self.obs_size = agents_obs[0].shape[1]
         self.state_size = state.shape[0]
         self.last_v = self.powergrid.res_bus["vm_pu"].sort_index().to_numpy(copy=True)
         self.last_q = self.powergrid.sgen["q_mvar"].to_numpy(copy=True)
@@ -89,7 +88,7 @@ class VoltageControl(MultiAgentEnv):
             if reset_time:
                 self._episode_start_hour = self._select_start_hour()
                 self._episode_start_day = self._select_start_day()
-                self._episode_start_quarter = self._select_start_quarter()
+                self._episode_start_interval = self._select_start_interval()
             # get one episode of data
             self.pv_histories = self._get_episode_pv_history()
             self.active_demand_histories = self._get_episode_active_demand_history()
@@ -112,7 +111,7 @@ class VoltageControl(MultiAgentEnv):
                 solvable = False
         return self.get_obs(), self.get_state()
     
-    def manual_reset(self, day, hour, quarter):
+    def manual_reset(self, day, hour, interval):
         # reset the time step, cumulative rewards and obs history
         self.steps = 1
         self.sum_rewards = 0
@@ -123,7 +122,7 @@ class VoltageControl(MultiAgentEnv):
         # reset the time stamp
         self._episode_start_hour = hour
         self._episode_start_day = day
-        self._episode_start_quarter = quarter
+        self._episode_start_interval = interval
         solvable = False
         while not solvable:
             # get one episode of data
@@ -186,20 +185,15 @@ class VoltageControl(MultiAgentEnv):
         """
         state = []
         if "demand" in self.state_space:
-            # TODO: check the correctness
             state += list(self.powergrid.res_bus["p_mw"].sort_index().to_numpy(copy=True))
             state += list(self.powergrid.res_bus["q_mvar"].sort_index().to_numpy(copy=True))
         if "pv" in self.state_space:
-            # TODO: check the correctness
             state += list(self.powergrid.sgen["p_mw"].sort_index().to_numpy(copy=True))
         if "reactive" in self.state_space:
-            # TODO: check the correctness
             state += list(self.powergrid.sgen["q_mvar"].sort_index().to_numpy(copy=True))
         if "vm_pu" in self.state_space:
-            # TODO: check the correctness
             state += list(self.powergrid.res_bus["vm_pu"].sort_index().to_numpy(copy=True))
         if "va_degree" in self.state_space:
-            # TODO: check the correctness
             state += list(self.powergrid.res_bus["va_degree"].sort_index().to_numpy(copy=True))
         state = np.array(state)
         return state
@@ -233,7 +227,7 @@ class VoltageControl(MultiAgentEnv):
                     if "vm_pu" in self.state_space:
                         obs += list(zone_buses.loc[:, "vm_pu"].to_numpy(copy=True))
                     if "va_degree" in self.state_space:
-                        # transform the voltage phase to radius
+                        # transform the voltage phase to radian
                         obs += list(zone_buses.loc[:, "va_degree"].to_numpy(copy=True) * np.pi / 180)
                     obs_zone_dict[zone] = np.array(obs)
                 obs_len_list.append(obs_zone_dict[zone].shape[0])
@@ -271,11 +265,8 @@ class VoltageControl(MultiAgentEnv):
             for obs_zone in zone_obs_list:
                 pad_obs_zone = np.concatenate( [obs_zone, np.zeros(obs_max_len - obs_zone.shape[0])], axis=0 )
                 agents_obs.append(pad_obs_zone)
-                # extend to the axis 0
-                # agents_obs.append(pad_obs_zone[np.newaxis, :])
         if self.horizon > 1:
             agents_obs_ = []
-            # obs_shape = (obs_shape,)
             for i, obs in enumerate(agents_obs):
                 if len(self.obs_history[i]) >= self.horizon - 1:
                     obs_ = np.concatenate(self.obs_history[i][-self.horizon+1:]+[obs], axis=0)
@@ -287,13 +278,6 @@ class VoltageControl(MultiAgentEnv):
                 agents_obs_.append(copy.deepcopy(obs_))
                 self.obs_history[i].append(copy.deepcopy(obs))
             agents_obs = agents_obs_
-        # label agent id
-        # agents_obs_id = []
-        # agents_ids = np.eye(self.n_agents)
-        # for i, obs in enumerate(agents_obs):
-        #     obs_id = np.concatenate( (obs, agents_ids[i]), axis=0 )
-        #     agents_obs_id.append( copy.deepcopy(obs_id) )
-        # agents_obs = agents_obs_id
         return agents_obs
 
     def get_obs_agent(self, agent_id):
@@ -364,18 +348,18 @@ class VoltageControl(MultiAgentEnv):
         """
         return np.random.choice(24)
     
-    def _select_start_quarter(self):
-        """select start quarter for an episode
+    def _select_start_interval(self):
+        """select start interval for an episode
         """
-        return np.random.choice(4)
+        return np.random.choice( 60 // self.time_delta )
 
     def _select_start_day(self):
         """select start day (date) for an episode
         """
         pv_data = self.pv_data
-        pv_days = (pv_data.index[-1] - pv_data.index[0])
-        pv_days = pv_days.days
-        episode_days = ( self.episode_limit // (24 * 4) ) + 1  # margin
+        pv_days = (pv_data.index[-1] - pv_data.index[0]).days
+        self.time_delta = (pv_data.index[1] - pv_data.index[0]).seconds // 60
+        episode_days = ( self.episode_limit // (24 * (60 // self.time_delta) ) ) + 1  # margin
         return np.random.choice(pv_days - episode_days)
 
     def _load_network(self):
@@ -387,7 +371,7 @@ class VoltageControl(MultiAgentEnv):
 
     def _load_pv_data(self):
         """load pv data
-        the sensor frequency is set to 15 mins as default
+        the sensor frequency is set to 3 or 15 mins as default
         """
         pv_path = os.path.join(self.data_path, 'pv_active.csv')
         pv = pd.read_csv(pv_path, index_col=None)
@@ -398,7 +382,7 @@ class VoltageControl(MultiAgentEnv):
 
     def _load_active_demand_data(self):
         """load active demand data
-        the sensor frequency is set to 15 mins as default
+        the sensor frequency is set to 3 or 15 mins as default
         """
         demand_path = os.path.join(self.data_path, 'load_active.csv')
         demand = pd.read_csv(demand_path, index_col=None)
@@ -409,7 +393,7 @@ class VoltageControl(MultiAgentEnv):
     
     def _load_reactive_demand_data(self):
         """load reactive demand data
-        the sensor frequency is set to 15 mins as default
+        the sensor frequency is set to 3 or 15 mins as default
         """
         demand_path = os.path.join(self.data_path, 'load_reactive.csv')
         demand = pd.read_csv(demand_path, index_col=None)
@@ -423,10 +407,9 @@ class VoltageControl(MultiAgentEnv):
         """
         episode_length = self.episode_limit
         horizon = self.horizon
-        # convert the start date to quarters
-        start = self._episode_start_quarter + self._episode_start_hour * 4 + self._episode_start_day * 24 * 4
-        nr_quarters = episode_length + horizon + 1  # margin of 1
-        episode_pv_history = self.pv_data[start:start + nr_quarters].values
+        start = self._episode_start_interval + self._episode_start_hour * (60 // self.time_delta) + self._episode_start_day * 24 * (60 // self.time_delta)
+        nr_intervals = episode_length + horizon + 1  # margin of 1
+        episode_pv_history = self.pv_data[start:start + nr_intervals].values
         return episode_pv_history
     
     def _get_episode_active_demand_history(self):
@@ -434,9 +417,9 @@ class VoltageControl(MultiAgentEnv):
         """
         episode_length = self.episode_limit
         horizon = self.horizon
-        start = self._episode_start_quarter + self._episode_start_hour * 4 + self._episode_start_day * 24 * 4
-        nr_quarters = episode_length + horizon + 1  # margin of 1
-        episode_demand_history = self.active_demand_data[start:start + nr_quarters].values
+        start = self._episode_start_interval + self._episode_start_hour * (60 // self.time_delta) + self._episode_start_day * 24 * (60 // self.time_delta)
+        nr_intervals = episode_length + horizon + 1  # margin of 1
+        episode_demand_history = self.active_demand_data[start:start + nr_intervals].values
         return episode_demand_history
     
     def _get_episode_reactive_demand_history(self):
@@ -444,9 +427,9 @@ class VoltageControl(MultiAgentEnv):
         """
         episode_length = self.episode_limit
         horizon = self.horizon
-        start = self._episode_start_quarter + self._episode_start_hour * 4 + self._episode_start_day * 24 * 4
-        nr_quarters = episode_length + horizon + 1  # margin of 1
-        episode_demand_history = self.reactive_demand_data[start:start + nr_quarters].values
+        start = self._episode_start_interval + self._episode_start_hour * (60 // self.time_delta) + self._episode_start_day * 24 * (60 // self.time_delta)
+        nr_intervals = episode_length + horizon + 1  # margin of 1
+        episode_demand_history = self.reactive_demand_data[start:start + nr_intervals].values
         return episode_demand_history
 
     def _get_pv_history(self):
@@ -470,7 +453,6 @@ class VoltageControl(MultiAgentEnv):
         horizon = self.horizon
         return self.reactive_demand_histories[t:t+horizon, :]
 
-    # TODO: DOUBLE CHECK
     def _set_demand_and_pv(self, add_noise=True):
         """update the demand and pv production according to the histories with some i.i.d. noise.
         """ 
@@ -563,22 +545,17 @@ class VoltageControl(MultiAgentEnv):
         info["percentage_of_lower_than_lower_v"] = np.sum(v < self.v_lower) / v.shape[0]
         info["percentage_of_higher_than_upper_v"] = np.sum(v > self.v_upper) / v.shape[0]
         info["totally_controllable_ratio"] = 0. if percent_of_v_out_of_control > 1e-3 else 1.
-        # v_main = self.powergrid.res_bus['vm_pu'].loc[self.powergrid.bus['zone']=='main']
-        # info["percentage_of_v_out_of_control_no_main"] = percent_of_v_out_of_control - ( np.sum(v_main < self.v_lower) + np.sum(v_main > self.v_upper) ) / v.shape[0]
-        # info["totally_controllable_ratio_no_main"] = 0. if info["percentage_of_v_out_of_control_no_main"] > 1e-3 else 1.
         # voltage violation
         v_ref = 0.5 * (self.v_lower + self.v_upper)
         info["average_voltage_deviation"] = np.mean( np.abs( v - v_ref ) )
         info["average_voltage"] = np.mean(v)
-        # info["max_voltage_drop_deviation"] = np.max( (v < v_ref) * (v_ref - v) )
-        # info["max_voltage_rise_deviation"] = np.max( (v > v_ref) * (v - v_ref) )
         info["max_voltage_drop_deviation"] = np.max( (v < self.v_lower) * (self.v_lower - v) )
         info["max_voltage_rise_deviation"] = np.max( (v > self.v_upper) * (v - self.v_upper) )
         # line loss
         line_loss = np.sum(self.powergrid.res_line["pl_mw"])
         avg_line_loss = np.mean(self.powergrid.res_line["pl_mw"])
         info["total_line_loss"] = line_loss
-        # reactive power loss
+        # reactive power (q) loss
         q = self.powergrid.res_sgen["q_mvar"].sort_index().to_numpy(copy=True)
         q_loss = np.mean(np.abs(q))
         info["q_loss"] = q_loss
@@ -593,8 +570,7 @@ class VoltageControl(MultiAgentEnv):
             v_loss = np.mean(self.liu_loss(v, self.v_lower, self.v_upper)) * self.voltage_weight
         elif self.reward_type == "bump":
             v_loss = np.mean(self.bump_loss(v)) * self.voltage_weight
-        # print (f"This is the line_weight: {type(self.line_weight)}")
-        # print (f"This is the q_weight: {self.q_weight}")
+        ## add soft constraint for line or q
         if self.line_weight != None:
             loss = avg_line_loss * self.line_weight + v_loss
         elif self.q_weight != None:
@@ -641,14 +617,14 @@ class VoltageControl(MultiAgentEnv):
         return np.array([_bowl_loss(v) for v in vs])
 
     def bump_loss(self, vs):
-        def _bump(v):
+        def _bump_loss(v):
             if np.abs(v) < 1:
                 return np.exp( - 1 / (1 - v**4) )
             elif 1 < v < 3:
                 return np.exp( - 1 / (1 - ( v - 2 )**4 ) )
             else:
                 return 0.0
-        return np.array([_bump(v) for v in vs])
+        return np.array([_bump_loss(v) for v in vs])
 
     def _get_res_bus_v(self):
         v = self.powergrid.res_bus["vm_pu"].sort_index().to_numpy(copy=True)

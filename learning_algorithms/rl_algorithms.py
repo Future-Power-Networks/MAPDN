@@ -1,5 +1,5 @@
 import numpy as np
-import torch
+import torch as th
 from torch import optim
 import torch.nn as nn
 from utilities.util import *
@@ -9,7 +9,8 @@ class ReinforcementLearning(object):
     def __init__(self, name, args):
         self.name = name
         self.args = args
-        self.cuda_ = torch.cuda.is_available() and self.args.cuda
+        # self.cuda_ = th.cuda.is_available() and self.args.cuda
+        self.device = th.device( "cuda" if th.cuda.is_available() and self.args.cuda else "cpu" )
 
     def __str__(self):
         print (self.name)

@@ -1,4 +1,4 @@
-import torch
+import torch as th
 from utilities.util import cuda_wrapper, translate_action, prep_obs
 import numpy as np
 
@@ -8,7 +8,7 @@ class PGTester(object):
         self.env = env
         self.behaviour_net = behaviour_net.cuda().eval() if args.cuda else behaviour_net.eval()
         self.args = args
-        self.cuda_ = self.args.cuda and torch.cuda.is_available()
+        self.cuda_ = self.args.cuda and th.cuda.is_available()
         self.n_ = self.args.agent_num
         self.obs_dim = self.args.obs_size
         self.act_dim = self.args.action_dim
@@ -37,7 +37,7 @@ class PGTester(object):
 
         for t in range(self.args.max_steps):
             state_ = cuda_wrapper(prep_obs(state).contiguous().view(1, self.n_, self.obs_dim), self.cuda_)
-            action, _, _, _, hid = self.behaviour_net.get_actions(state_, status='test', exploration=False, actions_avail=torch.tensor(self.env.get_avail_actions()), target=False, last_hid=last_hid)
+            action, _, _, _, hid = self.behaviour_net.get_actions(state_, status='test', exploration=False, actions_avail=th.tensor(self.env.get_avail_actions()), target=False, last_hid=last_hid)
             _, actual = translate_action(self.args, action, self.env)
             reward, done, info = self.env.step(actual, add_noise=False)
             done_ = done or t==self.args.max_steps-1
@@ -68,7 +68,7 @@ class PGTester(object):
 
             for t in range(self.args.max_steps):
                 state_ = cuda_wrapper(prep_obs(state).contiguous().view(1, self.n_, self.obs_dim), self.cuda_)
-                action, _, _, _, hid = self.behaviour_net.get_actions(state_, status='test', exploration=False, actions_avail=torch.tensor(self.env.get_avail_actions()), target=False, last_hid=last_hid)
+                action, _, _, _, hid = self.behaviour_net.get_actions(state_, status='test', exploration=False, actions_avail=th.tensor(self.env.get_avail_actions()), target=False, last_hid=last_hid)
                 _, actual = translate_action(self.args, action, self.env)
                 reward, done, info = self.env.step(actual, add_noise=False)
                 done_ = done or t==self.args.max_steps-1

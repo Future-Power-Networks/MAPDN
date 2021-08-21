@@ -1,32 +1,35 @@
 from collections import namedtuple
 import numpy as np
-import torch
+import torch as th
 from torch import optim
 import torch.nn as nn
 from utilities.util import cuda_wrapper, multinomial_entropy, get_grad_norm, normal_entropy, batchnorm
 from utilities.replay_buffer import TransReplayBuffer, EpisodeReplayBuffer
 
 
+
 class PGTrainer(object):
     def __init__(self, args, model, env, logger):
         self.args = args
-        self.cuda_ = self.args.cuda and torch.cuda.is_available()
+        self.device = th.device( "cuda" if th.cuda.is_available() and self.args.cuda else "cpu" )
         self.logger = logger
         self.episodic = self.args.episodic
         if self.args.target:
-            target_net = model(self.args).cuda() if self.cuda_ else model(self.args)
-            self.behaviour_net = model(self.args, target_net).cuda() if self.cuda_ else model(self.args, target_net)
+            target_net = model(self.args).to(self.device)
+            self.behaviour_net = model(self.args, target_net).to(self.device)
         else:
-            self.behaviour_net = model(self.args).cuda() if self.cuda_ else model(self.args)
+            self.behaviour_net = model(self.args).to(self.device)
         if self.args.replay:
             if not self.episodic:
                 self.replay_buffer = TransReplayBuffer( int(self.args.replay_buffer_size) )
             else:
                 self.replay_buffer = EpisodeReplayBuffer( int(self.args.replay_buffer_size) )
         self.env = env
-        self.policy_optimizer = optim.RMSprop( self.behaviour_net.policy_dicts.parameters(), lr=args.policy_lrate )
-        self.value_optimizer = optim.RMSprop( self.behaviour_net.value_dicts.parameters(), lr=args.value_lrate )
-        self.init_action = cuda_wrapper( torch.zeros(1, self.args.agent_num, self.args.action_dim), cuda=self.cuda_ )
+        self.policy_optimizer = optim.RMSprop( self.behaviour_net.policy_dicts.parameters(), lr=args.policy_lrate, alpha=0.99, eps=1e-5 )
+        self.value_optimizer = optim.RMSprop( self.behaviour_net.value_dicts.parameters(), lr=args.value_lrate, alpha=0.99, eps=1e-5 )
+        if self.args.mixer:
+            self.mixer_optimizer = optim.RMSprop( self.behaviour_net.mixer.parameters(), lr=args.mixer_lrate, alpha=0.99, eps=1e-5 )
+        self.init_action = th.zeros(1, self.args.agent_num, self.args.action_dim).to(self.device)
         self.steps = 0
         self.episodes = 0
         self.entr = self.args.entr
@@ -44,7 +47,7 @@ class PGTrainer(object):
                 policy_loss, logits = loss
                 entropy = multinomial_entropy(logits)
             policy_loss -= self.entr * entropy
-            stat['entropy'] = entropy.item()
+            stat['mean_train_entropy'] = entropy.item()
         policy_loss.backward(retain_graph=retain_graph)
 
     def value_compute_grad(self, value_loss, retain_graph):
@@ -64,6 +67,11 @@ class PGTrainer(object):
         batch = self.behaviour_net.Transition(*zip(*batch))
         self.value_transition_process(stat, batch)
 
+    def mixer_replay_process(self, stat):
+        batch = self.replay_buffer.get_batch(self.args.batch_size)
+        batch = self.behaviour_net.Transition(*zip(*batch))
+        self.mixer_transition_process(stat, batch)
+
     def policy_transition_process(self, stat, trans):
         if self.args.continuous:
             policy_loss, _, logits = self.get_loss(trans)
@@ -76,24 +84,30 @@ class PGTrainer(object):
         else:
             self.policy_compute_grad(stat, (policy_loss, logits), False)
         param = self.policy_optimizer.param_groups[0]['params']
-        if self.args.grad_clip:
-            self.grad_clip(param)
-        policy_grad_norms = get_grad_norm(param)
+        policy_grad_norms = get_grad_norm(self.args, param)
         self.policy_optimizer.step()
-        stat['policy_grad_norm'] = np.array(policy_grad_norms).mean()
-        stat['policy_loss'] = policy_loss.clone().mean().item()
+        stat['mean_train_policy_grad_norm'] = policy_grad_norms.item() # np.array(policy_grad_norms).mean()
+        stat['mean_train_policy_loss'] = policy_loss.clone().mean().item()
 
     def value_transition_process(self, stat, trans):
         _, value_loss, _ = self.get_loss(trans)
         self.value_optimizer.zero_grad()
         self.value_compute_grad(value_loss, False)
         param = self.value_optimizer.param_groups[0]['params']
-        if self.args.grad_clip:
-            self.grad_clip(param)
-        value_grad_norms = get_grad_norm(param)
+        value_grad_norms = get_grad_norm(self.args, param)
         self.value_optimizer.step()
-        stat['value_grad_norm'] = np.array(value_grad_norms).mean()
-        stat['value_loss'] = value_loss.mean().item()
+        stat['mean_train_value_grad_norm'] = value_grad_norms.item() # np.array(value_grad_norms).mean()
+        stat['mean_train_value_loss'] = value_loss.clone().mean().item()
+
+    def mixer_transition_process(self, stat, trans):
+        _, value_loss, _ = self.get_loss(trans)
+        self.mixer_optimizer.zero_grad()
+        self.value_compute_grad(value_loss, False)
+        param = self.mixer_optimizer.param_groups[0]['params']
+        mixer_grad_norms = get_grad_norm(self.args, param)
+        self.mixer_optimizer.step()
+        stat['mean_train_mixer_grad_norm'] = mixer_grad_norms.item() # np.array(value_grad_norms).mean()
+        stat['mean_train_mixer_loss'] = value_loss.clone().mean().item()
 
     def run(self, stat, episode):
         self.behaviour_net.train_process(stat, self)

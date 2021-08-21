@@ -3,4 +3,6 @@ alg: "iac"
 alg_args:
     "policy_lrate": 1.0e-4
     "value_lrate": 1.0e-4
+    "gaussian_policy": False
+    "action_enforcebound": True
     

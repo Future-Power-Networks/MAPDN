@@ -1,4 +1,4 @@
-import torch
+import torch as th
 import torch.nn as nn
 import numpy as np
 from utilities.util import select_action, cuda_wrapper, batchnorm
@@ -17,6 +17,7 @@ class MADDPG(Model):
         if target_net != None:
             self.target_net = target_net
             self.reload_params_to_target()
+        self.batchnorm = nn.BatchNorm1d(self.args.agent_num).to(self.device)
 
     def construct_value_net(self):
         if self.args.agent_id:
@@ -42,10 +43,9 @@ class MADDPG(Model):
         obs_reshape = obs_repeat.contiguous().view(batch_size, self.n_, -1) # shape = (b, n, n*o)
 
         # add agent id
-        agent_ids = torch.eye(self.n_).unsqueeze(0).repeat(batch_size, 1, 1) # shape = (b, n, n)
-        agent_ids = cuda_wrapper(agent_ids, self.cuda_)
+        agent_ids = th.eye(self.n_).unsqueeze(0).repeat(batch_size, 1, 1).to(self.device) # shape = (b, n, n)
         if self.args.agent_id:
-            obs_reshape = torch.cat( (obs_reshape, agent_ids), dim=-1 ) # shape = (b, n, n*o+n)
+            obs_reshape = th.cat( (obs_reshape, agent_ids), dim=-1 ) # shape = (b, n, n*o+n)
         
         # make up inputs
         act_repeat = act.unsqueeze(1).repeat(1, self.n_, 1, 1) # shape = (b, n, n, a)
@@ -64,7 +64,7 @@ class MADDPG(Model):
             obs_reshape = obs_reshape.contiguous().view( batch_size, self.n_, -1 ) # shape = (b, n, n*o+n)
             act_reshape = act_repeat.contiguous().view( batch_size, self.n_, -1 ) # shape = (b, n, n*a)
 
-        inputs = torch.cat( (obs_reshape, act_reshape), dim=-1 )
+        inputs = th.cat( (obs_reshape, act_reshape), dim=-1 )
 
         if self.args.shared_params:
             agent_value = self.value_dicts[0]
@@ -75,25 +75,26 @@ class MADDPG(Model):
             for i, agent_value in enumerate(self.value_dicts):
                 value, _ = agent_value(inputs[:, i, :], None)
                 values.append(value)
-            values = torch.stack(values, dim=1)
+            values = th.stack(values, dim=1)
 
         return values
 
     def get_actions(self, state, status, exploration, actions_avail, target=False, last_hid=None):
+        target_policy = self.target_net.policy if self.args.target else self.policy
         if self.args.continuous:
-            means, log_stds, hiddens = self.policy(state, last_hid=last_hid) if not target else self.target_net.policy(state, last_hid=last_hid)
+            means, log_stds, hiddens = self.policy(state, last_hid=last_hid) if not target else target_policy(state, last_hid=last_hid)
             if means.size(-1) > 1:
                 means_ = means.sum(dim=1, keepdim=True)
                 log_stds_ = log_stds.sum(dim=1, keepdim=True)
             else:
                 means_ = means
                 log_stds_ = log_stds
-            actions, log_prob_a = select_action(self.args, means_, status=status, exploration=exploration, info={'enforcing_action_bound': self.args.action_enforcebound, 'log_std': log_stds_})
-            restore_mask = 1. - cuda_wrapper((actions_avail == 0).float(), self.cuda_)
+            actions, log_prob_a = select_action(self.args, means_, status=status, exploration=exploration, info={'log_std': log_stds_})
+            restore_mask = 1. - (actions_avail == 0).to(self.device).float()
             restore_actions = restore_mask * actions
             action_out = (means, log_stds)
         else:
-            logits, _, hiddens = self.policy(state, last_hid=last_hid) if not target else self.target_net.policy(state, last_hid=last_hid)
+            logits, _, hiddens = self.policy(state, last_hid=last_hid) if not target else target_policy(state, last_hid=last_hid)
             logits[actions_avail == 0] = -9999999
             actions, log_prob_a = select_action(self.args, logits, status=status, exploration=exploration)
             restore_actions = actions
@@ -104,11 +105,14 @@ class MADDPG(Model):
         batch_size = len(batch.state)
         state, actions, old_log_prob_a, old_values, old_next_values, rewards, next_state, done, last_step, actions_avail, last_hids, hids = self.unpack_data(batch)
         _, actions_pol, log_prob_a, action_out, _ = self.get_actions(state, status='train', exploration=False, actions_avail=actions_avail, target=False, last_hid=last_hids)
-        _, next_actions, _, _, _ = self.get_actions(next_state, status='train', exploration=False, actions_avail=actions_avail, target=self.args.target, last_hid=hids)
+        if self.args.double_q:
+            _, next_actions, _, _, _ = self.get_actions(next_state, status='train', exploration=False, actions_avail=actions_avail, target=False, last_hid=hids)
+        else:
+            _, next_actions, _, _, _ = self.get_actions(next_state, status='train', exploration=False, actions_avail=actions_avail, target=True, last_hid=hids)
         values_pol = self.value(state, actions_pol).contiguous().view(-1, self.n_)
         values = self.value(state, actions).contiguous().view(-1, self.n_)
         next_values = self.target_net.value(next_state, next_actions.detach()).contiguous().view(-1, self.n_)
-        returns = cuda_wrapper(torch.zeros((batch_size, self.n_), dtype=torch.float), self.cuda_)
+        returns = th.zeros((batch_size, self.n_), dtype=th.float).to(self.device)
         assert values_pol.size() == next_values.size()
         assert returns.size() == values.size()
         for i in reversed(range(rewards.size(0))):
@@ -120,10 +124,8 @@ class MADDPG(Model):
         deltas = returns - values
         advantages = values_pol
         if self.args.normalize_advantages:
-            advantages = batchnorm(advantages)
+            advantages = self.batchnorm(advantages)
         policy_loss = - advantages
-        # policy_loss = policy_loss.mean(dim=0)
-        # value_loss = deltas.pow(2).mean(dim=0)
         policy_loss = policy_loss.mean()
         value_loss = deltas.pow(2).mean()
         return policy_loss, value_loss, action_out

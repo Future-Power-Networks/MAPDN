@@ -7,6 +7,5 @@ alg_args:
     "norm_in": False
     "soft": True
     "reward_scale": 100
-    "LOG_STD_MIN": 0.0
-    "LOG_STD_MAX": 0.5
+    "gaussian_policy": True
     "action_enforcebound": True

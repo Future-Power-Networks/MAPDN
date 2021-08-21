@@ -1,4 +1,4 @@
-import torch
+import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
@@ -100,9 +100,6 @@ class AttentionCritic(nn.Module):
                                                  are logged
         """
         agents = range(len(self.critic_encoders))
-        # states = [s for s, a in inps]
-        # actions = [a for s, a in inps]
-        # inps = [torch.cat((s, a), dim=1) for s, a in inps]
         states, actions, sa = inps
         # extract state-action encoding for each agent
         sa_encodings = [encoder(inp) for encoder, inp in zip(self.critic_encoders, sa)]
@@ -127,12 +124,12 @@ class AttentionCritic(nn.Module):
                 keys = [k for j, k in enumerate(curr_head_keys) if j != a_i]
                 values = [v for j, v in enumerate(curr_head_values) if j != a_i]
                 # calculate attention across agents
-                attend_logits = torch.matmul(selector.view(selector.shape[0], 1, -1),
-                                             torch.stack(keys).permute(1, 2, 0))
+                attend_logits = th.matmul(selector.view(selector.shape[0], 1, -1),
+                                             th.stack(keys).permute(1, 2, 0))
                 # scale dot-products by size of key (from Attention is All You Need)
                 scaled_attend_logits = attend_logits / np.sqrt(keys[0].shape[1])
                 attend_weights = F.softmax(scaled_attend_logits, dim=2)
-                other_values = (torch.stack(values).permute(1, 2, 0) *
+                other_values = (th.stack(values).permute(1, 2, 0) *
                                 attend_weights).sum(dim=2)
                 other_all_values[i].append(other_values)
                 all_attend_logits[i].append(attend_logits)
@@ -142,11 +139,11 @@ class AttentionCritic(nn.Module):
         for i, a_i in enumerate(agents):
             agent_rets = []
             if self.continuous:
-                critic_in = torch.cat((sa_encodings[i], *other_all_values[i]), dim=1)
+                critic_in = th.cat((sa_encodings[i], *other_all_values[i]), dim=1)
                 all_q = self.critics[a_i](critic_in)
                 q = all_q
             else:
-                critic_in = torch.cat((s_encodings[i], *other_all_values[i]), dim=1)
+                critic_in = th.cat((s_encodings[i], *other_all_values[i]), dim=1)
                 all_q = self.critics[a_i](critic_in)
                 int_acs = actions[a_i].max(dim=1, keepdim=True)[1]
                 q = all_q.gather(1, int_acs)

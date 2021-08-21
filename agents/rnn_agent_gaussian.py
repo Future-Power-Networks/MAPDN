@@ -16,6 +16,11 @@ class RNNAgent(nn.Module):
         # self.fc2 = nn.Linear(args.hid_size, args.action_dim)
         self.mean = nn.Linear(args.hid_size, args.action_dim)
         self.log_std = nn.Linear(args.hid_size, args.action_dim)
+        
+        if self.args.hid_activation == 'relu':
+            self.hid_activation = nn.ReLU()
+        elif self.args.hid_activation == 'tanh':
+            self.hid_activation = nn.Tanh()
 
     def init_hidden(self):
         # make hidden states on same device as model
@@ -25,7 +30,7 @@ class RNNAgent(nn.Module):
         x = self.fc1(inputs)
         if self.args.layernorm:
             x = self.layernorm(x)
-        x = F.relu(x)
+        x = self.hid_activation(x)
         h_in = hidden_state.reshape(-1, self.args.hid_size)
         h = self.rnn(x, h_in)
         # a = self.fc2(h)

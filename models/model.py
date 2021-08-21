@@ -1,15 +1,16 @@
-import torch
+import torch as th
 import torch.nn as nn
 import numpy as np
 from collections import namedtuple
 from utilities.util import cuda_wrapper, prep_obs, select_action, translate_action, batchnorm
 
 
+
 class Model(nn.Module):
     def __init__(self, args):
         super(Model, self).__init__()
         self.args = args
-        self.cuda_ = torch.cuda.is_available() and self.args.cuda
+        self.device = th.device( "cuda" if th.cuda.is_available() and self.args.cuda else "cpu" )
         self.n_ = self.args.agent_num
         self.hid_dim = self.args.hid_size
         self.obs_dim = self.args.obs_size
@@ -20,6 +21,8 @@ class Model(nn.Module):
     def reload_params_to_target(self):
         self.target_net.policy_dicts.load_state_dict( self.policy_dicts.state_dict() )
         self.target_net.value_dicts.load_state_dict( self.value_dicts.state_dict() )
+        if self.args.mixer:
+            self.target_net.mixer.load_state_dict( self.mixer.state_dict() )
 
     def update_target(self):
         for name, param in self.target_net.policy_dicts.state_dict().items():
@@ -28,6 +31,10 @@ class Model(nn.Module):
         for name, param in self.target_net.value_dicts.state_dict().items():
             update_params = (1 - self.args.target_lr) * param + self.args.target_lr * self.value_dicts.state_dict()[name]
             self.target_net.value_dicts.state_dict()[name].copy_(update_params)
+        if self.args.mixer:
+            for name, param in self.target_net.mixer.state_dict().items():
+                update_params = (1 - self.args.target_lr) * param + self.args.target_lr * self.mixer.state_dict()[name]
+                self.target_net.mixer.state_dict()[name].copy_(update_params)
 
     def transition_update(self, trainer, trans, stat):
         if self.args.replay:
@@ -40,6 +47,9 @@ class Model(nn.Module):
                     trainer.value_replay_process(stat)
                 for _ in range(self.args.policy_update_epochs):
                     trainer.policy_replay_process(stat)
+                if self.args.mixer:
+                    for _ in range(self.args.mixer_update_epochs):
+                        trainer.mixer_replay_process(stat)
                 # TODO: hard code
                 # clear replay buffer for on-policy algorithm
                 if self.__class__.__name__ in ["COMA", "IAC", "IPPO", "MAPPO"] :
@@ -50,7 +60,10 @@ class Model(nn.Module):
                 for _ in range(self.args.value_update_epochs):
                     trainer.value_replay_process(stat)
                 for _ in range(self.args.policy_update_epochs):
-                    trainer.policy_transition_process(stat, trans)
+                    trainer.policy_replay_process(stat, trans)
+                if self.args.mixer:
+                    for _ in range(self.args.mixer_update_epochs):
+                        trainer.mixer_replay_process(stat)
         if self.args.target:
             target_cond = trainer.steps%self.args.target_update_freq==0
             if target_cond:
@@ -67,6 +80,9 @@ class Model(nn.Module):
                     trainer.value_replay_process(stat)
                 for _ in range(self.args.policy_update_epochs):
                     trainer.policy_replay_process(stat)
+                if self.args.mixer:
+                    for _ in range(self.args.mixer_update_epochs):
+                        trainer.mixer_replay_process(stat)
         else:
             episode = self.Transition(*zip(*episode))
             episode_cond = trainer.episodes%self.args.behaviour_update_freq==0
@@ -74,7 +90,10 @@ class Model(nn.Module):
                 for _ in range(self.args.value_update_epochs):
                     trainer.value_replay_process(stat)
                 for _ in range(self.args.policy_update_epochs):
-                    trainer.policy_transition_process(stat)
+                    trainer.policy_replay_process(stat)
+                if self.args.mixer:
+                    for _ in range(self.args.mixer_update_epochs):
+                        trainer.mixer_replay_process(stat)
 
     def construct_model(self):
         raise NotImplementedError()
@@ -85,29 +104,37 @@ class Model(nn.Module):
 
         # add agent id
         if self.args.agent_id:
-            agent_ids = torch.eye(self.n_).unsqueeze(0).repeat(batch_size, 1, 1) # shape = (b, n, n)
-            agent_ids = cuda_wrapper(agent_ids, self.cuda_)
-            obs = torch.cat( (obs, agent_ids), dim=-1 ) # shape = (b, n, n+o)
+            agent_ids = th.eye(self.n_).unsqueeze(0).repeat(batch_size, 1, 1).to(self.device) # shape = (b, n, n)
+            obs = th.cat( (obs, agent_ids), dim=-1 ) # shape = (b, n, n+o)
 
         if self.args.shared_params:
             # print (f"This is the shape of last_hids: {last_hid.size()}")
             obs = obs.contiguous().view(batch_size*self.n_, -1) # shape = (b*n, n+o/o)
             agent_policy = self.policy_dicts[0]
-            means, hiddens = agent_policy(obs, last_hid)
-            # hiddens = torch.stack(hiddens, dim=1)
+            means, log_stds, hiddens = agent_policy(obs, last_hid)
+            # hiddens = th.stack(hiddens, dim=1)
             means = means.contiguous().view(batch_size, self.n_, -1)
             hiddens = hiddens.contiguous().view(batch_size, self.n_, -1)
-            log_stds = cuda_wrapper(torch.zeros_like(means), self.cuda_)
+            if self.args.gaussian_policy:
+                log_stds = log_stds.contiguous().view(batch_size, self.n_, -1)
+            else:
+                stds = th.ones_like(means).to(self.device) * self.args.fixed_policy_std
+                log_stds = th.log(stds)
         else:
             means = []
             hiddens = []
+            log_stds = []
             for i, agent_policy in enumerate(self.policy_dicts):
-                mean, hidden = agent_policy(obs[:, i, :], last_hid[:, i, :])
+                mean, log_std, hidden = agent_policy(obs[:, i, :], last_hid[:, i, :])
                 means.append(mean)
                 hiddens.append(hidden)
-            means = torch.stack(means, dim=1)
-            hiddens = torch.stack(hiddens, dim=1)
-            log_stds = cuda_wrapper(torch.zeros_like(means), self.cuda_)
+                log_stds.append(log_std)
+            means = th.stack(means, dim=1)
+            hiddens = th.stack(hiddens, dim=1)
+            if self.args.gaussian_policy:
+                log_stds = th.stack(log_stds, dim=1)
+            else:
+                log_stds = th.zeros_like(means).to(self.device)
 
         return means, log_stds, hiddens
 
@@ -121,10 +148,16 @@ class Model(nn.Module):
             input_shape = self.obs_dim
 
         if self.args.agent_type == 'mlp':
-            from agents.mlp_agent import MLPAgent
+            if self.args.gaussian_policy:
+                from agents.mlp_agent_gaussian import MLPAgent
+            else:
+                from agents.mlp_agent import MLPAgent
             Agent = MLPAgent
         elif self.args.agent_type == 'rnn':
-            from agents.rnn_agent import RNNAgent
+            if self.args.gaussian_policy:
+                from agents.rnn_agent_gaussian import RNNAgent
+            else:
+                from agents.rnn_agent import RNNAgent
             Agent = RNNAgent
         else:
             NotImplementedError()
@@ -145,7 +178,7 @@ class Model(nn.Module):
             if self.args.init_type == "normal":
                 nn.init.normal_(m.weight, 0.0, self.args.init_std)
             elif self.args.init_type == "orthogonal":
-                nn.init.orthogonal_(m.weight, gain=nn.init.calculate_gain('tanh'))
+                nn.init.orthogonal_(m.weight, gain=nn.init.calculate_gain(self.args.hid_activation))
 
     def get_actions(self):
         raise NotImplementedError()
@@ -156,8 +189,8 @@ class Model(nn.Module):
     def credit_assignment_demo(self, obs, act):
         assert isinstance(obs, np.ndarray)
         assert isinstance(act, np.ndarray)
-        obs = cuda_wrapper(torch.tensor(obs).float(), self.cuda_)
-        act = cuda_wrapper(torch.tensor(act).float(), self.cuda_)
+        obs = th.tensor(obs).to(self.device).float()
+        act = th.tensor(act).to(self.device).float()
         values = self.value(obs, act)
         return values
 
@@ -175,8 +208,8 @@ class Model(nn.Module):
 
         for t in range(self.args.max_steps):
             # current state, action, value
-            state_ = cuda_wrapper(prep_obs(state).contiguous().view(1, self.n_, self.obs_dim), self.cuda_)
-            action, action_pol, log_prob_a, _, hid = self.get_actions(state_, status='train', exploration=True, actions_avail=torch.tensor(trainer.env.get_avail_actions()), target=False, last_hid=last_hid)
+            state_ = prep_obs(state).to(self.device).contiguous().view(1, self.n_, self.obs_dim)
+            action, action_pol, log_prob_a, _, hid = self.get_actions(state_, status='train', exploration=True, actions_avail=th.tensor(trainer.env.get_avail_actions()), target=False, last_hid=last_hid)
             value = self.value(state_, action_pol)
             _, actual = translate_action(self.args, action, trainer.env)
             # reward
@@ -184,8 +217,8 @@ class Model(nn.Module):
             reward_repeat = [reward]*trainer.env.get_num_of_agents()
             # next state, action, value
             next_state = trainer.env.get_obs()
-            next_state_ = cuda_wrapper(prep_obs(next_state).contiguous().view(1, self.n_, self.obs_dim), self.cuda_)
-            _, next_action_pol, _, _, _ = self.get_actions(next_state_, status='train', exploration=True, actions_avail=torch.tensor(trainer.env.get_avail_actions()), target=False, last_hid=hid)
+            next_state_ = prep_obs(next_state).to(self.device).contiguous().view(1, self.n_, self.obs_dim)
+            _, next_action_pol, _, _, _ = self.get_actions(next_state_, status='train', exploration=True, actions_avail=th.tensor(trainer.env.get_avail_actions()), target=False, last_hid=hid)
             next_value = self.value(next_state_, next_action_pol)
             # store trajectory
             if isinstance(done, list): done = np.sum(done)
@@ -230,16 +263,16 @@ class Model(nn.Module):
             self.episode_update(trainer, episode, stat)
 
     def evaluation(self, stat, trainer):
-        eval_times = 10
+        num_eval_episodes = self.args.num_eval_episodes
         stat_test = {}
-        for _ in range(eval_times):
+        for _ in range(num_eval_episodes):
             stat_test_epi = {'mean_test_reward': 0}
             state, global_state = trainer.env.reset()
             # init hidden states
             last_hid = self.policy_dicts[0].init_hidden()
             for t in range(self.args.max_steps):
-                state_ = cuda_wrapper(prep_obs(state).contiguous().view(1, self.n_, self.obs_dim), self.cuda_)
-                action, _, _, _, hid = self.get_actions(state_, status='test', exploration=False, actions_avail=torch.tensor(trainer.env.get_avail_actions()), target=False, last_hid=last_hid)
+                state_ = prep_obs(state).to(self.device).contiguous().view(1, self.n_, self.obs_dim)
+                action, _, _, _, hid = self.get_actions(state_, status='test', exploration=False, actions_avail=th.tensor(trainer.env.get_avail_actions()), target=False, last_hid=last_hid)
                 _, actual = translate_action(self.args, action, trainer.env)
                 reward, done, info = trainer.env.step(actual)
                 done_ = done or t==self.args.max_steps-1
@@ -265,22 +298,22 @@ class Model(nn.Module):
                 else:
                     stat_test[k] += v
         for k, v in stat_test.items():
-            stat_test[k] = v / float(eval_times)
+            stat_test[k] = v / float(num_eval_episodes)
         stat.update(stat_test)
 
     def unpack_data(self, batch):
-        reward = cuda_wrapper(torch.tensor(batch.reward, dtype=torch.float), self.cuda_)
-        last_step = cuda_wrapper(torch.tensor(batch.last_step, dtype=torch.float).contiguous().view(-1, 1), self.cuda_)
-        done = cuda_wrapper(torch.tensor(batch.done, dtype=torch.float).contiguous().view(-1, 1), self.cuda_)
-        action = cuda_wrapper(torch.tensor(np.concatenate(batch.action, axis=0), dtype=torch.float), self.cuda_)
-        log_prob_a = cuda_wrapper(torch.tensor(np.concatenate(batch.action, axis=0), dtype=torch.float), self.cuda_)
-        value = cuda_wrapper(torch.tensor(np.concatenate(batch.value, axis=0), dtype=torch.float), self.cuda_)
-        next_value = cuda_wrapper(torch.tensor(np.concatenate(batch.next_value, axis=0), dtype=torch.float), self.cuda_)
-        state = cuda_wrapper(prep_obs(list(zip(batch.state))), self.cuda_)
-        next_state = cuda_wrapper(prep_obs(list(zip(batch.next_state))), self.cuda_)
-        action_avail = cuda_wrapper(torch.tensor(np.concatenate(batch.action_avail, axis=0)), self.cuda_)
-        last_hid = cuda_wrapper(torch.tensor(np.concatenate(batch.last_hid, axis=0), dtype=torch.float), self.cuda_)
-        hid = cuda_wrapper(torch.tensor(np.concatenate(batch.hid, axis=0), dtype=torch.float), self.cuda_)
+        reward = th.tensor(batch.reward, dtype=th.float).to(self.device)
+        last_step = th.tensor(batch.last_step, dtype=th.float).to(self.device).contiguous().view(-1, 1)
+        done = th.tensor(batch.done, dtype=th.float).to(self.device).contiguous().view(-1, 1)
+        action = th.tensor(np.concatenate(batch.action, axis=0), dtype=th.float).to(self.device)
+        log_prob_a = th.tensor(np.concatenate(batch.action, axis=0), dtype=th.float).to(self.device)
+        value = th.tensor(np.concatenate(batch.value, axis=0), dtype=th.float).to(self.device)
+        next_value = th.tensor(np.concatenate(batch.next_value, axis=0), dtype=th.float).to(self.device)
+        state = prep_obs( list( zip(batch.state) ) ).to(self.device)
+        next_state = prep_obs( list( zip(batch.next_state) ) ).to(self.device)
+        action_avail = th.tensor( np.concatenate(batch.action_avail, axis=0) ).to(self.device)
+        last_hid = th.tensor(np.concatenate(batch.last_hid, axis=0), dtype=th.float).to(self.device)
+        hid = th.tensor(np.concatenate(batch.hid, axis=0), dtype=th.float).to(self.device)
         if self.args.reward_normalisation:
-            reward = self.batchnorm(reward)
+            reward = self.batchnorm(reward).to(self.device)
         return (state, action, log_prob_a, value, next_value, reward, next_state, done, last_step, action_avail, last_hid, hid)

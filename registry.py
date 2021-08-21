@@ -8,6 +8,8 @@ from models.maac import MAAC
 from models.matd3 import MATD3
 from models.ippo import IPPO
 from models.mappo import MAPPO
+from models.facmaddpg import FACMADDPG
+
 
 
 Model = dict(maddpg=MADDPG,
@@ -18,7 +20,8 @@ Model = dict(maddpg=MADDPG,
              maac=MAAC,
              matd3=MATD3,
              ippo=IPPO,
-             mappo=MAPPO
+             mappo=MAPPO,
+             facmaddpg=FACMADDPG
             )
 
 Strategy=dict(maddpg='pg',
@@ -29,5 +32,6 @@ Strategy=dict(maddpg='pg',
               maac='pg',
               matd3='pg',
               ippo='pg',
-              mappo='pg'
+              mappo='pg',
+              facmaddpg='pg'
              )

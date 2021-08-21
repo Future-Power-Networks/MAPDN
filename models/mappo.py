@@ -1,4 +1,4 @@
-import torch
+import torch as th
 import torch.nn as nn
 import numpy as np
 from utilities.util import select_action, cuda_wrapper, batchnorm
@@ -29,26 +29,6 @@ class MAPPO(Model):
         else:
             self.value_dicts = nn.ModuleList( [ MLPCritic(input_shape, output_shape, self.args) for _ in range(self.n_) ] )
 
-    def construct_policy_net(self):
-        if self.args.agent_id:
-            input_shape = self.obs_dim + self.n_
-        else:
-            input_shape = self.obs_dim
-
-        if self.args.agent_type == 'mlp':
-            from agents.mlp_agent_ppo import MLPAgent
-            Agent = MLPAgent
-        elif self.args.agent_type == 'rnn':
-            from agents.rnn_agent_ppo import RNNAgent
-            Agent = RNNAgent
-        else:
-            NotImplementedError()
-
-        if self.args.shared_params:
-            self.policy_dicts = nn.ModuleList([ Agent(input_shape, self.args) ])
-        else:
-            self.policy_dicts = nn.ModuleList([ Agent(input_shape, self.args) for _ in range(self.n_) ])
-
     def construct_model(self):
         self.construct_value_net()
         self.construct_policy_net()
@@ -64,9 +44,8 @@ class MAPPO(Model):
 
         # add agent id
         if self.args.agent_id:
-            agent_ids = torch.eye(self.n_).unsqueeze(0).repeat(batch_size, 1, 1) # shape = (b, n, n)
-            agent_ids = cuda_wrapper(agent_ids, self.cuda_)
-            inp = torch.cat( (obs, agent_ids), dim=-1 ) # shape = (b, n, o*n+n)
+            agent_ids = th.eye(self.n_).unsqueeze(0).repeat(batch_size, 1, 1).to(self.device) # shape = (b, n, n)
+            inp = th.cat( (obs, agent_ids), dim=-1 ) # shape = (b, n, o*n+n)
         else:
             inp = obs
         
@@ -81,25 +60,26 @@ class MAPPO(Model):
             for i, agent_value in enumerate(self.value_dicts):
                 value, _ = agent_value(inputs[:, i, :], None)
                 values.append(value)
-            values = torch.stack(values, dim=1)
+            values = th.stack(values, dim=1)
             
         return values
 
     def get_actions(self, state, status, exploration, actions_avail, target=False, last_hid=None):
+        target_policy = self.target_net.policy if self.args.target else self.policy
         if self.args.continuous:
-            means, log_stds, hiddens = self.policy(state, last_hid=last_hid) if not target else self.target_net.policy(state, last_hid=last_hid)
+            means, log_stds, hiddens = self.policy(state, last_hid=last_hid) if not target else target_policy(state, last_hid=last_hid)
             if means.size(-1) > 1:
                 means_ = means.sum(dim=1, keepdim=True)
                 log_stds_ = log_stds.sum(dim=1, keepdim=True)
             else:
                 means_ = means
                 log_stds_ = log_stds
-            actions, log_prob_a = select_action(self.args, means_, status=status, exploration=exploration, info={'enforcing_action_bound': self.args.action_enforcebound, 'log_std': log_stds_})
-            restore_mask = 1. - cuda_wrapper((actions_avail == 0).float(), self.cuda_)
+            actions, log_prob_a = select_action(self.args, means_, status=status, exploration=exploration, info={'log_std': log_stds_})
+            restore_mask = 1. - (actions_avail == 0).to(self.device).float()
             restore_actions = restore_mask * actions
             action_out = (means, log_stds)
         else:
-            logits, _, hiddens = self.policy(state, last_hid=last_hid) if not target else self.target_net.policy(state, last_hid=last_hid)
+            logits, _, hiddens = self.policy(state, last_hid=last_hid) if not target else target_policy(state, last_hid=last_hid)
             logits[actions_avail == 0] = -9999999
             actions, log_prob_a = select_action(self.args, logits, status=status, exploration=exploration)
             restore_actions = actions

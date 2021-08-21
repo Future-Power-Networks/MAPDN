@@ -1,4 +1,4 @@
-import torch
+import torch as th
 import torch.nn as nn
 import numpy as np
 from utilities.util import cuda_wrapper, select_action, batchnorm, prep_obs
@@ -16,6 +16,7 @@ class SQDDPG(Model):
             self.target_net = target_net
             self.reload_params_to_target()
         self.sample_size = self.args.sample_size
+        self.batchnorm = nn.BatchNorm1d(self.args.agent_num).to(self.device)
 
     def construct_value_net(self):
         if self.args.agent_id:
@@ -33,12 +34,12 @@ class SQDDPG(Model):
         self.construct_policy_net()
 
     def sample_grandcoalitions(self, batch_size):
-        seq_set = cuda_wrapper(torch.tril(torch.ones(self.n_, self.n_), diagonal=0, out=None), self.cuda_)
-        grand_coalitions = cuda_wrapper(torch.multinomial(torch.ones(batch_size*self.sample_size, self.n_)/self.n_, self.n_, replacement=False), self.cuda_)
-        individual_map = cuda_wrapper(torch.zeros(batch_size*self.sample_size*self.n_, self.n_), self.cuda_)
+        seq_set = th.tril(th.ones(self.n_, self.n_), diagonal=0, out=None).to(self.device)
+        grand_coalitions = th.multinomial(th.ones(batch_size*self.sample_size, self.n_)/self.n_, self.n_, replacement=False).to(self.device)
+        individual_map = th.zeros(batch_size*self.sample_size*self.n_, self.n_).to(self.device)
         individual_map.scatter_(1, grand_coalitions.contiguous().view(-1, 1), 1)
         individual_map = individual_map.contiguous().view(batch_size, self.sample_size, self.n_, self.n_)
-        subcoalition_map = torch.matmul(individual_map, seq_set)
+        subcoalition_map = th.matmul(individual_map, seq_set)
         grand_coalitions = grand_coalitions.unsqueeze(1).expand(batch_size*self.sample_size, self.n_, self.n_).contiguous().view(batch_size, self.sample_size, self.n_, self.n_) # shape = (b, n_s, n, n)
         return subcoalition_map, grand_coalitions, individual_map
 
@@ -60,15 +61,14 @@ class SQDDPG(Model):
         act = act.contiguous().view(batch_size, self.sample_size, self.n_, -1) # shape = (b, n_s, n, n*a)
         obs = obs.unsqueeze(1).unsqueeze(2).expand(batch_size, self.sample_size, self.n_, self.n_, self.obs_dim) # shape = (b, n, o) -> (b, 1, n, o) -> (b, 1, 1, n, o) -> (b, n_s, n, n, o)
         obs = obs.contiguous().view(batch_size, self.sample_size, self.n_, self.n_*self.obs_dim) # shape = (b, n_s, n, n, o) -> (b, n_s, n, n*o)
-        inp = torch.cat((obs, act), dim=-1) # shape = (b, n_s, n, n*o+n*a)
+        inp = th.cat((obs, act), dim=-1) # shape = (b, n_s, n, n*o+n*a)
 
         inp = inp.contiguous().view(batch_size*self.sample_size, self.n_, -1) # shape = (b*n_s, n, n*o+n*a)
 
         # add agent id
         if self.args.agent_id:
-            agent_ids = torch.eye(self.n_).unsqueeze(0).repeat(batch_size*self.sample_size, 1, 1) # shape = (b*n_s, n, n)
-            agent_ids = cuda_wrapper(agent_ids, self.cuda_)
-            inp = torch.cat( (inp, agent_ids), dim=-1 ) # shape = (b*n_s, n, n*o+n*a+n)
+            agent_ids = th.eye(self.n_).unsqueeze(0).repeat(batch_size*self.sample_size, 1, 1).to(self.device) # shape = (b*n_s, n, n)
+            inp = th.cat( (inp, agent_ids), dim=-1 ) # shape = (b*n_s, n, n*o+n*a+n)
         
         if self.args.shared_params:
             inputs = inp.contiguous().view( batch_size*self.sample_size*self.n_, -1 ) # shape = (b*n_s*n, n*o+n*a/n*o+n*a+n)
@@ -80,29 +80,32 @@ class SQDDPG(Model):
             for i, agent_value in enumerate(self.value_dicts):
                 value, _ = agent_value(inputs[:, i, :], None)
                 values.append(value)
-            values = torch.stack(values, dim=1)
+            values = th.stack(values, dim=1)
+            
         values = values.contiguous().view(batch_size, self.sample_size, self.n_, 1) # shape = (b, n_s, n, 1)
-        
+
         return values
 
     def value(self, obs, act):
         return self.marginal_contribution(obs, act)
         
     def get_actions(self, state, status, exploration, actions_avail, target=False, last_hid=None):
+        target_policy = self.target_net.policy if self.args.target else self.policy
         if self.args.continuous:
-            means, log_stds, hiddens = self.policy(state, last_hid=last_hid) if not target else self.target_net.policy(state, last_hid=last_hid)
+            means, log_stds, hiddens = self.policy(state, last_hid=last_hid) if not target else target_policy(state, last_hid=last_hid)
             if means.size(-1) > 1:
                 means_ = means.sum(dim=1, keepdim=True)
                 log_stds_ = log_stds.sum(dim=1, keepdim=True)
             else:
                 means_ = means
                 log_stds_ = log_stds
-            actions, log_prob_a = select_action(self.args, means_, status=status, exploration=exploration, info={'enforcing_action_bound': self.args.action_enforcebound, 'log_std': log_stds_})
-            restore_mask = 1. - cuda_wrapper((actions_avail == 0).float(), self.cuda_)
+            actions, log_prob_a = select_action(self.args, means_, status=status, exploration=exploration, info={'log_std': log_stds_})
+            # actions, log_prob_a = select_action(self.args, means_, status=status, exploration=exploration, info={'clip': target, 'log_std': log_stds_})
+            restore_mask = 1. - (actions_avail == 0).to(self.device).float()
             restore_actions = restore_mask * actions
             action_out = (means, log_stds)
         else:
-            logits, _, hiddens = self.policy(state, last_hid=last_hid) if not target else self.target_net.policy(state, last_hid=last_hid)
+            logits, _, hiddens = self.policy(state, last_hid=last_hid) if not target else target_policy(state, last_hid=last_hid)
             logits[actions_avail == 0] = -9999999
             actions, log_prob_a = select_action(self.args, logits, status=status, exploration=exploration)
             restore_actions = actions
@@ -113,7 +116,10 @@ class SQDDPG(Model):
         batch_size = len(batch.state)
         state, actions, old_log_prob_a, old_values, old_next_values, rewards, next_state, done, last_step, actions_avail, last_hids, hids = self.unpack_data(batch)
         _, actions_pol, log_prob_a, action_out, _ = self.get_actions(state, status='train', exploration=False, actions_avail=actions_avail, target=False, last_hid=last_hids)
-        _, next_actions, _, _, _ = self.get_actions(next_state, status='train', exploration=False, actions_avail=actions_avail, target=self.args.target, last_hid=hids)
+        if self.args.double_q:
+            _, next_actions, _, _, _ = self.get_actions(next_state, status='train', exploration=False, actions_avail=actions_avail, target=False, last_hid=hids)
+        else:
+            _, next_actions, _, _, _ = self.get_actions(next_state, status='train', exploration=False, actions_avail=actions_avail, target=True, last_hid=hids)
         shapley_values_pol = self.marginal_contribution(state, actions_pol).mean(dim=1).contiguous().view(-1, self.n_)
         # do the exploration action on the value loss
         shapley_values_sum = self.marginal_contribution(state, actions).mean(dim=1).contiguous().view(-1, self.n_).sum(dim=-1, keepdim=True).expand(batch_size, self.n_)
@@ -121,7 +127,7 @@ class SQDDPG(Model):
             next_shapley_values_sum = self.target_net.marginal_contribution(next_state, next_actions.detach()).mean(dim=1).contiguous().view(-1, self.n_).sum(dim=-1, keepdim=True).expand(batch_size, self.n_)
         else:
             next_shapley_values_sum = self.marginal_contribution(next_state, next_actions.detach()).mean(dim=1).contiguous().view(-1, self.n_).sum(dim=-1, keepdim=True).expand(batch_size, self.n_)
-        returns = cuda_wrapper(torch.zeros((batch_size, self.n_), dtype=torch.float), self.cuda_)
+        returns = th.zeros((batch_size, self.n_), dtype=th.float).to(self.device)
         assert shapley_values_sum.size() == next_shapley_values_sum.size()
         assert returns.size() == shapley_values_sum.size()
         for i in reversed(range(rewards.size(0))):
@@ -133,7 +139,7 @@ class SQDDPG(Model):
         deltas = returns - shapley_values_sum
         advantages = shapley_values_pol
         if self.args.normalize_advantages:
-            advantages = batchnorm(advantages)
+            advantages = self.batchnorm(advantages)
         policy_loss = - advantages
         policy_loss = policy_loss.mean()
         value_loss = deltas.pow(2).mean()
