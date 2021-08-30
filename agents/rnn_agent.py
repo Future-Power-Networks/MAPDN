@@ -32,5 +32,4 @@ class RNNAgent(nn.Module):
         h_in = hidden_state.reshape(-1, self.args.hid_size)
         h = self.rnn(x, h_in)
         a = self.fc2(h)
-        # a = th.tanh(self.fc2(h))
         return a, None, h

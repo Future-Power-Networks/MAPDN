@@ -32,5 +32,4 @@ class MLPAgent(nn.Module):
         x = self.hid_activation(x)
         h = self.hid_activation(self.fc2(x))
         a = self.fc3(h)
-        # a = th.tanh(self.fc3(h))
         return a, None, h

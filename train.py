@@ -33,41 +33,53 @@ env_config_dict["data_path"] = "/".join(data_path)
 net_topology = argv.scenario
 assert net_topology in ['bus33bw_gu', 'bus141_gu', 'bus322_gu', 'bus33bw_gu_3min', 'bus141_gu_3min', 'bus322_gu_3min'], f'{net_topology} is not a valid scenario.'
 if argv.difficulty == "easy":
-    env_config_dict["pv_scale"] = 0.5
-    env_config_dict["demand_scale"] = 1.0
     if argv.scenario in ['bus33bw_gu', 'bus33bw_gu_3min']:
+        env_config_dict["pv_scale"] = 0.5
+        env_config_dict["demand_scale"] = 1.0
         env_config_dict["action_bias"] = 0.0
         env_config_dict["action_scale"] = 0.7
     elif argv.scenario in ['bus141_gu', 'bus141_gu_3min']:
+        env_config_dict["pv_scale"] = 0.5
+        env_config_dict["demand_scale"] = 1.0
         env_config_dict["action_bias"] = 0.0
         env_config_dict["action_scale"] = 0.8
     elif argv.scenario in ['bus322_gu', 'bus322_gu_3min']:
+        env_config_dict["pv_scale"] = 0.5
+        env_config_dict["demand_scale"] = 1.0
         env_config_dict["action_bias"] = 0.0
         env_config_dict["action_scale"] = 0.5
 elif argv.difficulty == "hard":
-    env_config_dict["pv_scale"] = 0.8
-    env_config_dict["demand_scale"] = 1.0
     if argv.scenario in ['bus33bw_gu', 'bus33bw_gu_3min']:
+        env_config_dict["pv_scale"] = 0.8
+        env_config_dict["demand_scale"] = 1.0
         env_config_dict["action_bias"] = 0.0
         env_config_dict["action_scale"] = 0.7
     elif argv.scenario in ['bus141_gu', 'bus141_gu_3min']:
+        env_config_dict["pv_scale"] = 0.8
+        env_config_dict["demand_scale"] = 1.0
         env_config_dict["action_bias"] = 0.0
         env_config_dict["action_scale"] = 0.8
     elif argv.scenario in ['bus322_gu', 'bus322_gu_3min']:
+        env_config_dict["pv_scale"] = 0.8
+        env_config_dict["demand_scale"] = 1.0
         env_config_dict["action_bias"] = 0.0
         env_config_dict["action_scale"] = 0.4
 elif argv.difficulty == "super_hard":
-    env_config_dict["pv_scale"] = 1.0 * 0.3
-    env_config_dict["demand_scale"] = 1.0 * 0.3
     if argv.scenario in ['bus33bw_gu', 'bus33bw_gu_3min']:
+        env_config_dict["pv_scale"] = 0.7
+        env_config_dict["demand_scale"] = 0.7
         env_config_dict["action_bias"] = 0.0
-        env_config_dict["action_scale"] = 0.5
+        env_config_dict["action_scale"] = 0.8
     elif argv.scenario in ['bus141_gu', 'bus141_gu_3min']:
+        env_config_dict["pv_scale"] = 1.0
+        env_config_dict["demand_scale"] = 1.0
         env_config_dict["action_bias"] = 0.0
         env_config_dict["action_scale"] = 0.6
     elif argv.scenario in ['bus322_gu', 'bus322_gu_3min']:
+        env_config_dict["pv_scale"] = 0.3
+        env_config_dict["demand_scale"] = 0.3
         env_config_dict["action_bias"] = 0.0
-        env_config_dict["action_scale"] = 0.3
+        env_config_dict["action_scale"] = 0.8
 else:
     raise RuntimeError("Please input the correct difficulty level, e.g. easy, hard or super_hard.")
 assert argv.mode in ['distributed', 'decentralised'], "Please input the correct mode, e.g. distributed or decentralised."

@@ -6,7 +6,7 @@ env_args:
     "q_weight": 0.1
     "line_weight": null
     "dq_dv_weight": null
-    "horizon": 1
+    "history": 1
     "pv_scale": null
     "demand_scale": null
     "state_space": ["pv", "demand", "reactive", "vm_pu", "va_degree"]

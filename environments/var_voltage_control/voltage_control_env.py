@@ -57,7 +57,7 @@ class VoltageControl(MultiAgentEnv):
 
         # define action space and observation space
         self.action_space = ActionSpace(low=-self.args.action_scale+self.args.action_bias, high=self.args.action_scale+self.args.action_bias)
-        self.horizon = getattr(args, "horizon", 1)
+        self.history = getattr(args, "history", 1)
         self.state_space = getattr(args, "state_space", ["pv", "demand", "reactive", "vm_pu", "va_degree"])
         if self.args.mode == "distributed":
             self.n_actions = 1
@@ -78,7 +78,7 @@ class VoltageControl(MultiAgentEnv):
         # reset the time step, cumulative rewards and obs history
         self.steps = 1
         self.sum_rewards = 0
-        if self.horizon > 1:
+        if self.history > 1:
             self.obs_history = {i: [] for i in range(self.n_agents)}
         # reset the power grid
         self.powergrid = copy.deepcopy(self.base_powergrid)
@@ -115,7 +115,7 @@ class VoltageControl(MultiAgentEnv):
         # reset the time step, cumulative rewards and obs history
         self.steps = 1
         self.sum_rewards = 0
-        if self.horizon > 1:
+        if self.history > 1:
             self.obs_history = {i: [] for i in range(self.n_agents)}
         # reset the power grid
         self.powergrid = copy.deepcopy(self.base_powergrid)
@@ -265,13 +265,13 @@ class VoltageControl(MultiAgentEnv):
             for obs_zone in zone_obs_list:
                 pad_obs_zone = np.concatenate( [obs_zone, np.zeros(obs_max_len - obs_zone.shape[0])], axis=0 )
                 agents_obs.append(pad_obs_zone)
-        if self.horizon > 1:
+        if self.history > 1:
             agents_obs_ = []
             for i, obs in enumerate(agents_obs):
-                if len(self.obs_history[i]) >= self.horizon - 1:
-                    obs_ = np.concatenate(self.obs_history[i][-self.horizon+1:]+[obs], axis=0)
+                if len(self.obs_history[i]) >= self.history - 1:
+                    obs_ = np.concatenate(self.obs_history[i][-self.history+1:]+[obs], axis=0)
                 else:
-                    zeros = [np.zeros_like(obs)] * ( self.horizon - len(self.obs_history[i]) - 1 )
+                    zeros = [np.zeros_like(obs)] * ( self.history - len(self.obs_history[i]) - 1 )
                     obs_ = self.obs_history[i] + [obs]
                     obs_ = zeros + obs_
                     obs_ = np.concatenate(obs_, axis=0)
@@ -406,9 +406,9 @@ class VoltageControl(MultiAgentEnv):
         """return the pv history in an episode
         """
         episode_length = self.episode_limit
-        horizon = self.horizon
+        history = self.history
         start = self._episode_start_interval + self._episode_start_hour * (60 // self.time_delta) + self._episode_start_day * 24 * (60 // self.time_delta)
-        nr_intervals = episode_length + horizon + 1  # margin of 1
+        nr_intervals = episode_length + history + 1  # margin of 1
         episode_pv_history = self.pv_data[start:start + nr_intervals].values
         return episode_pv_history
     
@@ -416,9 +416,9 @@ class VoltageControl(MultiAgentEnv):
         """return the active power histories for all loads in an episode
         """
         episode_length = self.episode_limit
-        horizon = self.horizon
+        history = self.history
         start = self._episode_start_interval + self._episode_start_hour * (60 // self.time_delta) + self._episode_start_day * 24 * (60 // self.time_delta)
-        nr_intervals = episode_length + horizon + 1  # margin of 1
+        nr_intervals = episode_length + history + 1  # margin of 1
         episode_demand_history = self.active_demand_data[start:start + nr_intervals].values
         return episode_demand_history
     
@@ -426,9 +426,9 @@ class VoltageControl(MultiAgentEnv):
         """return the reactive power histories for all loads in an episode
         """
         episode_length = self.episode_limit
-        horizon = self.horizon
+        history = self.history
         start = self._episode_start_interval + self._episode_start_hour * (60 // self.time_delta) + self._episode_start_day * 24 * (60 // self.time_delta)
-        nr_intervals = episode_length + horizon + 1  # margin of 1
+        nr_intervals = episode_length + history + 1  # margin of 1
         episode_demand_history = self.reactive_demand_data[start:start + nr_intervals].values
         return episode_demand_history
 
@@ -436,22 +436,22 @@ class VoltageControl(MultiAgentEnv):
         """returns pv history
         """
         t = self.steps
-        horizon = self.horizon
-        return self.pv_histories[t:t+horizon, :]
+        history = self.history
+        return self.pv_histories[t:t+history, :]
 
     def _get_active_demand_history(self):
         """return the history demand
         """
         t = self.steps
-        horizon = self.horizon
-        return self.active_demand_histories[t:t+horizon, :]
+        history = self.history
+        return self.active_demand_histories[t:t+history, :]
     
     def _get_reactive_demand_history(self):
         """return the history demand
         """
         t = self.steps
-        horizon = self.horizon
-        return self.reactive_demand_histories[t:t+horizon, :]
+        history = self.history
+        return self.reactive_demand_histories[t:t+history, :]
 
     def _set_demand_and_pv(self, add_noise=True):
         """update the demand and pv production according to the histories with some i.i.d. noise.
