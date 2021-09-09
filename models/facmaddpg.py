@@ -106,12 +106,15 @@ class FACMADDPG(Model):
         returns = th.zeros_like(q_tot).to(self.device)
         assert q_tot.size() == next_q_tot.size()
         assert returns.size() == q_tot.size()
-        for i in reversed(range(rewards.size(0))):
-            if last_step[i]:
-                next_return = 0 if done[i] else next_q_tot[i].detach()
-            else:
-                next_return = next_q_tot[i].detach()
-            returns[i] = rewards[i][0] + self.args.gamma * next_return
+        # for i in reversed(range(rewards.size(0))):
+        #     if last_step[i]:
+        #         next_return = 0 if done[i] else next_q_tot[i].detach()
+        #     else:
+        #         next_return = next_q_tot[i].detach()
+        #     returns[i] = rewards[i][0] + self.args.gamma * next_return
+        done = done.to(self.device)
+        # last_step = last_step.to(self.device)
+        returns = rewards[:, 0:1] + self.args.gamma * (1 - done) * next_q_tot.detach()
         deltas = returns - q_tot
         advantages = values_pol
         if self.args.normalize_advantages:

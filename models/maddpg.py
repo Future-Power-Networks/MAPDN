@@ -115,12 +115,15 @@ class MADDPG(Model):
         returns = th.zeros((batch_size, self.n_), dtype=th.float).to(self.device)
         assert values_pol.size() == next_values.size()
         assert returns.size() == values.size()
-        for i in reversed(range(rewards.size(0))):
-            if last_step[i]:
-                next_return = 0 if done[i] else next_values[i].detach()
-            else:
-                next_return = next_values[i].detach()
-            returns[i] = rewards[i] + self.args.gamma * next_return
+        # for i in reversed(range(rewards.size(0))):
+        #     if last_step[i]:
+        #         next_return = 0 if done[i] else next_values[i].detach()
+        #     else:
+        #         next_return = next_values[i].detach()
+        #     returns[i] = rewards[i] + self.args.gamma * next_return
+        done = done.to(self.device)
+        # last_step = last_step.to(self.device)
+        returns = rewards + self.args.gamma * (1 - done) * next_values.detach()
         deltas = returns - values
         advantages = values_pol
         if self.args.normalize_advantages:

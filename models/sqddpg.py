@@ -130,12 +130,15 @@ class SQDDPG(Model):
         returns = th.zeros((batch_size, self.n_), dtype=th.float).to(self.device)
         assert shapley_values_sum.size() == next_shapley_values_sum.size()
         assert returns.size() == shapley_values_sum.size()
-        for i in reversed(range(rewards.size(0))):
-            if last_step[i]:
-                next_return = 0 if done[i] else next_shapley_values_sum[i].detach()
-            else:
-                next_return = next_shapley_values_sum[i].detach()
-            returns[i] = rewards[i] + self.args.gamma * next_return
+        # for i in reversed(range(rewards.size(0))):
+        #     if last_step[i]:
+        #         next_return = 0 if done[i] else next_shapley_values_sum[i].detach()
+        #     else:
+        #         next_return = next_shapley_values_sum[i].detach()
+        #     returns[i] = rewards[i] + self.args.gamma * next_return
+        done = done.to(self.device)
+        # last_step = last_step.to(self.device)
+        returns = rewards + self.args.gamma * (1 - done) * next_shapley_values_sum.detach()
         deltas = returns - shapley_values_sum
         advantages = shapley_values_pol
         if self.args.normalize_advantages:
