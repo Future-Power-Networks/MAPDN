@@ -17,7 +17,7 @@
 "target": True
 "target_lr": 0.1
 "entr": 1.0e-3
-"max_steps": 240
+"max_steps": 480 # 240
 "batch_size": 32 # transition update: steps / episodic update: episodes
 "replay": True
 "replay_buffer_size": 5.0e+3
