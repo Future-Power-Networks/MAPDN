@@ -6,6 +6,7 @@ import pandas as pd
 import copy
 import os
 from collections import namedtuple
+from pandapower import plotting as plt
 
 
 def convert(dictionary):
@@ -41,11 +42,11 @@ class VoltageControl(MultiAgentEnv):
 
         # define episode and rewards
         self.episode_limit = args.episode_limit
-        self.reward_type = getattr(args, "reward_type", "sensitive")
-        self.voltage_weight = getattr(args, "voltage_weight", 0.5)
+        self.reward_type = getattr(args, "reward_type", "l1")
+        self.voltage_weight = getattr(args, "voltage_weight", 1.0)
         self.q_weight = getattr(args, "q_weight", 0.1)
-        self.line_weight = getattr(args, "line_weight", 0.1)
-        self.dv_dq_weight = getattr(args, "dq_dv_weight", 0.001)
+        self.line_weight = getattr(args, "line_weight", None)
+        self.dv_dq_weight = getattr(args, "dq_dv_weight", None)
 
         # define constraints and uncertainty
         self.v_upper = getattr(args, "v_upper", 1.05)
@@ -71,6 +72,8 @@ class VoltageControl(MultiAgentEnv):
         self.state_size = state.shape[0]
         self.last_v = self.powergrid.res_bus["vm_pu"].sort_index().to_numpy(copy=True)
         self.last_q = self.powergrid.sgen["q_mvar"].to_numpy(copy=True)
+
+        self._rendering_initialized = False
 
     def reset(self, reset_time=True):
         """reset the env
@@ -570,7 +573,7 @@ class VoltageControl(MultiAgentEnv):
             v_loss = np.mean(self.liu_loss(v, self.v_lower, self.v_upper)) * self.voltage_weight
         elif self.reward_type == "bump":
             v_loss = np.mean(self.bump_loss(v)) * self.voltage_weight
-        ## add soft constraint for line or q
+        # add soft constraint for line or q
         if self.line_weight != None:
             loss = avg_line_loss * self.line_weight + v_loss
         elif self.q_weight != None:
@@ -649,3 +652,20 @@ class VoltageControl(MultiAgentEnv):
     def _get_sgen_reactive(self):
         reactive = self.powergrid.sgen["q_mvar"].to_numpy(copy=True)
         return reactive
+    
+    def _init_render(self):
+        from .rendering_voltage_control_env import Viewer
+
+        self.viewer = Viewer()
+        self._rendering_initialized = True
+
+    def render(self, mode="human"):
+        if not self._rendering_initialized:
+            self._init_render()
+        return self.viewer.render(self, return_rgb_array=(mode == "rgb_array"))
+
+    def res_pf_plot(self):
+        if not os.path.exists("environments/var_voltage_control/plot_save"):
+            os.mkdir("environments/var_voltage_control/plot_save")
+        fig = plt.plotly.pf_res_plotly(self.powergrid, aspectratio=(1.0, 1.0), filename="environments/var_voltage_control/plot_save/pf_res_plot.html", auto_open=False)
+        fig.write_image("environments/var_voltage_control/plot_save/pf_res_plot.jpeg")
