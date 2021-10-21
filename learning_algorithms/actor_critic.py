@@ -1,7 +1,7 @@
 from learning_algorithms.rl_algorithms import ReinforcementLearning
 import torch as th
 import torch.nn as nn
-from utilities.util import select_action, cuda_wrapper, batchnorm, multinomials_log_density, normal_log_density
+from utilities.util import multinomials_log_density, normal_log_density
 
 
 class ActorCritic(ReinforcementLearning):
@@ -42,12 +42,6 @@ class ActorCritic(ReinforcementLearning):
         returns = th.zeros( (batch_size, n), dtype=th.float ).to(behaviour_net.device)
         assert values.size() == next_values.size()
         assert returns.size() == values.size()
-        # for i in reversed(range(rewards.size(0))):
-        #     if last_step[i]:
-        #         next_return = 0 if done[i] else next_values[i].detach()
-        #     else:
-        #         next_return = next_values[i].detach()
-        #     returns[i] = rewards[i] + self.args.gamma * next_return
         done = done.to(self.device)
         returns = rewards + self.args.gamma * (1 - done) * next_values.detach()
         deltas = returns - values
