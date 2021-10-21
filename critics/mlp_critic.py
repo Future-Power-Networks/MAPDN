@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+
 class MLPCritic(nn.Module):
     def __init__(self, input_shape, output_shape, args):
         super(MLPCritic, self).__init__()
