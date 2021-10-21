@@ -2,7 +2,7 @@ import torch as th
 import torch.nn as nn
 import numpy as np
 from collections import namedtuple
-from utilities.util import cuda_wrapper, prep_obs, select_action, translate_action, batchnorm
+from utilities.util import prep_obs, translate_action
 
 
 

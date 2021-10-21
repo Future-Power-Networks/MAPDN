@@ -1,10 +1,8 @@
 import torch as th
 import torch.nn as nn
 import numpy as np
-from utilities.util import select_action, cuda_wrapper, batchnorm
+from utilities.util import select_action
 from models.model import Model
-from learning_algorithms.ddpg import DDPG
-from collections import namedtuple
 from critics.mlp_critic import MLPCritic
 
 
@@ -136,14 +134,7 @@ class MATD3(Model):
         assert values_pol.size() == next_values1.size() == next_values2.size()
         assert returns.size() == values1.size() == values2.size()
         # update twin values by the minimized target q
-        # for i in reversed(range(rewards.size(0))):
-        #     if last_step[i]:
-        #         next_return = 0 if done[i] else th.minimum(next_values1[i].detach(), next_values2[i].detach())
-        #     else:
-        #         next_return = th.minimum(next_values1[i].detach(), next_values2[i].detach())
-        #     returns[i] = rewards[i] + self.args.gamma * next_return
         done = done.to(self.device)
-        # last_step = last_step.to(self.device)
         next_values = th.stack([next_values1, next_values2], -1)
         returns = rewards + self.args.gamma * (1 - done) * th.min(next_values.detach(), -1)[0]
         deltas1 = returns - values1

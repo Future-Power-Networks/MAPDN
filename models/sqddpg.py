@@ -1,10 +1,10 @@
 import torch as th
 import torch.nn as nn
 import numpy as np
-from utilities.util import cuda_wrapper, select_action, batchnorm, prep_obs
+from utilities.util import select_action
 from models.model import Model
-from collections import namedtuple
 from critics.mlp_critic import MLPCritic
+
 
 
 class SQDDPG(Model):
@@ -100,7 +100,6 @@ class SQDDPG(Model):
                 means_ = means
                 log_stds_ = log_stds
             actions, log_prob_a = select_action(self.args, means_, status=status, exploration=exploration, info={'log_std': log_stds_})
-            # actions, log_prob_a = select_action(self.args, means_, status=status, exploration=exploration, info={'clip': target, 'log_std': log_stds_})
             restore_mask = 1. - (actions_avail == 0).to(self.device).float()
             restore_actions = restore_mask * actions
             action_out = (means, log_stds)
@@ -130,14 +129,7 @@ class SQDDPG(Model):
         returns = th.zeros((batch_size, self.n_), dtype=th.float).to(self.device)
         assert shapley_values_sum.size() == next_shapley_values_sum.size()
         assert returns.size() == shapley_values_sum.size()
-        # for i in reversed(range(rewards.size(0))):
-        #     if last_step[i]:
-        #         next_return = 0 if done[i] else next_shapley_values_sum[i].detach()
-        #     else:
-        #         next_return = next_shapley_values_sum[i].detach()
-        #     returns[i] = rewards[i] + self.args.gamma * next_return
         done = done.to(self.device)
-        # last_step = last_step.to(self.device)
         returns = rewards + self.args.gamma * (1 - done) * next_shapley_values_sum.detach()
         deltas = returns - shapley_values_sum
         advantages = shapley_values_pol

@@ -1,7 +1,6 @@
 import torch as th
 import numpy as np
 from models.model import Model
-from collections import namedtuple
 
 
 

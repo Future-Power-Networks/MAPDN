@@ -1,11 +1,9 @@
-import torch
 import torch.nn as nn
-import numpy as np
 from utilities.util import *
 from models.model import Model
 from learning_algorithms.ddpg import DDPG
-from collections import namedtuple
 from critics.mlp_critic import MLPCritic
+
 
 
 class IDDPG(Model):

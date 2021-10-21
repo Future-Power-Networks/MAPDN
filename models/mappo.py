@@ -1,11 +1,11 @@
 import torch as th
 import torch.nn as nn
 import numpy as np
-from utilities.util import select_action, cuda_wrapper, batchnorm
+from utilities.util import select_action
 from models.model import Model
 from learning_algorithms.ppo import PPO
-from collections import namedtuple
 from critics.mlp_critic import MLPCritic
+
 
 
 class MAPPO(Model):
