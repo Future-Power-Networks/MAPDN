@@ -4,6 +4,7 @@ import torch.nn as nn
 from utilities.util import multinomials_log_density, normal_log_density
 
 
+
 class ActorCritic(ReinforcementLearning):
     def __init__(self, args):
         super(ActorCritic, self).__init__('Actor_Critic', args)
@@ -30,7 +31,6 @@ class ActorCritic(ReinforcementLearning):
             _, next_actions, _, _, _ = behaviour_net.get_actions(next_state, status='train', exploration=False, actions_avail=actions_avail, target=False, last_hid=hids)
         else:
             _, next_actions, _, _, _ = behaviour_net.get_actions(next_state, status='train', exploration=False, actions_avail=actions_avail, target=True, last_hid=hids)
-        # values_pol = behaviour_net.value(state, actions)
         values = behaviour_net.value(state, actions)
         if not self.args.continuous:
             values = th.sum(values*actions, dim=-1)
