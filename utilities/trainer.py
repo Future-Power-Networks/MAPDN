@@ -1,9 +1,7 @@
-from collections import namedtuple
 import numpy as np
 import torch as th
 from torch import optim
-import torch.nn as nn
-from utilities.util import cuda_wrapper, multinomial_entropy, get_grad_norm, normal_entropy, batchnorm
+from utilities.util import multinomial_entropy, get_grad_norm, normal_entropy
 from utilities.replay_buffer import TransReplayBuffer, EpisodeReplayBuffer
 
 
@@ -96,7 +94,7 @@ class PGTrainer(object):
         param = self.value_optimizer.param_groups[0]['params']
         value_grad_norms = get_grad_norm(self.args, param)
         self.value_optimizer.step()
-        stat['mean_train_value_grad_norm'] = value_grad_norms.item() # np.array(value_grad_norms).mean()
+        stat['mean_train_value_grad_norm'] = value_grad_norms.item()
         stat['mean_train_value_loss'] = value_loss.clone().mean().item()
 
     def mixer_transition_process(self, stat, trans):
@@ -106,7 +104,7 @@ class PGTrainer(object):
         param = self.mixer_optimizer.param_groups[0]['params']
         mixer_grad_norms = get_grad_norm(self.args, param)
         self.mixer_optimizer.step()
-        stat['mean_train_mixer_grad_norm'] = mixer_grad_norms.item() # np.array(value_grad_norms).mean()
+        stat['mean_train_mixer_grad_norm'] = mixer_grad_norms.item()
         stat['mean_train_mixer_loss'] = value_loss.clone().mean().item()
 
     def run(self, stat, episode):
@@ -119,7 +117,7 @@ class PGTrainer(object):
             self.logger.add_scalar('data/' + k, v, self.episodes)
 
     def print_info(self, stat):
-        string = [f'Episode: {self.episodes}']
+        string = [f'\nEpisode: {self.episodes}']
         for k, v in stat.items():
             string.append( k + f': {v:2.4f}' )
         string = "\n".join(string)

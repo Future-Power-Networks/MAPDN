@@ -1,7 +1,8 @@
 import torch as th
-from utilities.util import cuda_wrapper, translate_action, prep_obs
+from utilities.util import translate_action, prep_obs
 import numpy as np
 import time
+
 
 
 class PGTester(object):
@@ -52,7 +53,6 @@ class PGTester(object):
             record["bus_reactive"].append(self.env._get_res_bus_reactive())
             record["bus_voltage"].append(self.env._get_res_bus_v())
             record["line_loss"].append(self.env._get_res_line_loss())
-            # print (f"This is PV active: {self.env._get_sgen_active()}")
             next_state = self.env.get_obs()
             # set the next state
             state = next_state
@@ -72,6 +72,9 @@ class PGTester(object):
             last_hid = self.behaviour_net.policy_dicts[0].init_hidden()
 
             for t in range(self.args.max_steps):
+                if self.render:
+                    self.env.render()
+                    time.sleep(0.01)
                 state_ = prep_obs(state).contiguous().view(1, self.n_, self.obs_dim).to(self.device)
                 action, _, _, _, hid = self.behaviour_net.get_actions(state_, status='test', exploration=False, actions_avail=th.tensor(self.env.get_avail_actions()), target=False, last_hid=last_hid)
                 _, actual = translate_action(self.args, action, self.env)
