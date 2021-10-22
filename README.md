@@ -25,12 +25,14 @@ In this section, we give a brief introduction of this task so that the users can
 * Voltage.
 
 <br />
+
 <figure>
   <img src="img/bus33.png" height="240" weight="720">
   <figcaption>
     Figure 1: Illustration on 33-bus system. Each bus is indexed by a circle with a number. Four control regions are partitioned by the smallest path from the terminal to the main branch (bus 1-6). We control the voltage on bus 2-33 whereas bus 0-1 represent the substation with constant voltage and infinite active and reactive power capacity. G represents an external generator; small Ls represent loads; and emoji of sun represents the location where a PV is installed.
   </figcaption>
 </figure>
+
 <br />
 
 **Reward:** The reward function is shown as follows:
