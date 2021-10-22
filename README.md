@@ -24,7 +24,7 @@ In this section, we give a brief introduction of this task so that the users can
 * Voltage.
 
 <figure>
-  <img src="img/bus33.png" height="240" weight="720">
+  <img src="./img/bus33.png" height="240" weight="720">
   <figcaption>
     Figure 1: Illustration on 33-bus system. Each bus is indexed by a circle with a number. Four control regions are partitioned by the smallest path from the terminal to the main branch (bus 1-6). We control the voltage on bus 2-33 whereas bus 0-1 represent the substation with constant voltage and infinite active and reactive power capacity. G represents an external generator; small Ls represent loads; and emoji of sun represents the location where a PV is installed.
   </figcaption>
@@ -34,9 +34,6 @@ In this section, we give a brief introduction of this task so that the users can
 $$\mathit{r} = - \frac{1}{|V|} \sum_{i \in V} l_{v}(v_{i}) - \alpha \cdot l_{q}(\mathbf{q}^{\scriptscriptstyle PV}),$$
 where $l_{v}(\cdot)$ is voltage loss that measure whether the voltage of a bus is within the safety range; $l_{q}(\mathbf{q}^{\scriptscriptstyle PV})=\frac{1}{|\mathcal{I}|}||\mathbf{q}^{\scriptscriptstyle PV}||_{1}$ that can be seen as a simple approximation of power loss, where $\mathbf{q}^{\scriptscriptstyle PV}$ is a vector of agents' reactive power, $\mathcal{I}$ is a set of agents and $\alpha$ is a multiplier to adjust the balance between voltage control and the generation of reactive power. In this work, we investigate different forms of $l_{v}(\cdot)$. Literally, the aim of this reward function is controlling the voltage, meanwhile minimising the power loss that is correlated with the economic loss.
 
-## Two modes of Tasks
-
-There are 2 modes of tasks included in this environment, i.e. 
 
 ## Installation of the Dependencies
 
@@ -51,6 +48,7 @@ There are 2 modes of tasks included in this environment, i.e.
     conda activate distributed_powernet
     ```
 
+
 ## Downloading the Dataset
 
 1. Download the data from the link: https://drive.google.com/file/d/1Z23Z5mZhDcK6bO5tJ-D_WGxM6WpTJuYr/view?usp=sharing.
@@ -61,6 +59,36 @@ There are 2 modes of tasks included in this environment, i.e.
     * `bus322_3min_final`
 3. Go to the directory `[Your own parent path]/distributed-active-voltage-control/environments/var_voltage_control/` and create a folder called `data`.
 4. Move the 3 extracted folders by step 2 to the directory `[Your own parent path]/distributed-active-voltage-control/environments/var_voltage_control/data/`.
+
+
+## Two modes of Tasks
+
+### Background
+
+There are 2 modes of tasks included in this environment, i.e. distributed active voltage control and decentralised active voltage control. Distributed active voltage control is the task introduced in the paper [Multi-Agent Reinforcement Learning for Active Voltage Control on Power Distribution Networks](), whereas Decentralised active voltage control is the task that most of the prior works considers. The primary difference between these 2 modes of tasks are that in decentralised active voltage control the equipments in each zone are controlled by an agent, while in distributed active voltage control each equipment is controlled by an agent (see Figure 1).
+
+### How to use?
+
+If you would attempt distributed active voltage control, you can set the argument for `train.py` and `test.py` as follows.
+
+```bash
+python train.py --mode distributed
+```
+
+```bash
+python test.py --mode distributed
+```
+
+If you would attempt decentralised active voltage control, you can set the argument for `train.py` and `test.py` as follows.
+
+```bash
+python train.py --mode decentralised
+```
+
+```bash
+python test.py --mode decentralised
+```
+
 
 ## Quick Start
 
