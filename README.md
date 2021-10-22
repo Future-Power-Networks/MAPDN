@@ -34,7 +34,7 @@ In this section, we give a brief introduction of this task so that the users can
 
 **Reward:** The reward function is shown as follows:
 $$\mathit{r} = - \frac{1}{|V|} \sum_{i \in V} l_{v}(v_{i}) - \alpha \cdot l_{q}(\mathbf{q}^{\scriptscriptstyle PV}),$$
-where $l_{v}(\cdot)$ is voltage loss that measure whether the voltage of a bus is within the safety range; $l_{q}(\mathbf{q}^{\scriptscriptstyle PV})=\frac{1}{|\mathcal{I}|}||\mathbf{q}^{\scriptscriptstyle PV}||_{1}$ that can be seen as a simple approximation of power loss, where $\mathbf{q}^{\scriptscriptstyle PV}$ is a vector of agents' reactive power, $\mathcal{I}$ is a set of agents and $\alpha$ is a multiplier to adjust the balance between voltage control and the generation of reactive power. In this work, we investigate different forms of $l_{v}(\cdot)$. Literally, the aim of this reward function is controlling the voltage, meanwhile minimising the power loss that is correlated with the economic loss.
+where $l_{v}(\cdot)$ is voltage loss that measure whether the voltage of a bus is within the safety range; $l_{q}(\mathbf{q}^{\scriptscriptstyle PV})=\frac{1}{|\mathcal{I}|}||\mathbf{q}^{\scriptscriptstyle PV}||\_{1}$ that can be seen as a simple approximation of power loss, where $\mathbf{q}^{\scriptscriptstyle PV}$ is a vector of agents' reactive power, $\mathcal{I}$ is a set of agents and $\alpha$ is a multiplier to adjust the balance between voltage control and the generation of reactive power. In this work, we investigate different forms of $l_{v}(\cdot)$. Literally, the aim of this reward function is controlling the voltage, meanwhile minimising the power loss that is correlated with the economic loss.
 
 
 ## Installation of the Dependencies
@@ -99,7 +99,7 @@ python test.py --mode decentralised
 You can execute the following command to train a model on a power system using the following command.
 
 ```
-python train.py --alg matd3 --alias 0 --mode distributed --scenario bus33bw_gu_3min --reward-type l1 --save-path trial
+python train.py --alg matd3 --alias 0 --mode distributed --scenario bus33bw_gu_3min --voltage-loss-type l1 --save-path trial
 ```
 
 The the meanings of the arguments are illustrated as follows:
@@ -107,7 +107,7 @@ The the meanings of the arguments are illustrated as follows:
 * `--alias` is the alias to distinguish different experiments.
 * `--mode` is the mode of the envrionment. It contains 2 modes, e.g. distributed and decentralised. Distributed mode is the one introduced in this work, whereas decentralised mode is the traditional environment used by the prior works.
 * `--scenario` indicates the power system on which you would like to train.
-* `--reward-type` indicates the voltage loss you would like to use for training.
+* `--voltage-loss-type` indicates the voltage loss you would like to use for training.
 * `--save-path` is the path you would like to save the model, tensorboard and configures.
 
 ### Testing Your Model
@@ -115,7 +115,7 @@ The the meanings of the arguments are illustrated as follows:
 After training, you can exclusively test your model to do the further analysis using the following command.
 
 ```
-python test.py --save-path trial/model_save/bus33bw --alg matd3 --alias 0 --scenario bus33bw_gu_3min --reward-type l1 --test-mode single --test-day 730 --render
+python test.py --save-path trial/model_save/bus33bw --alg matd3 --alias 0 --scenario bus33bw_gu_3min --voltage-loss-type l1 --test-mode single --test-day 730 --render
 ```
 
 The the meanings of the arguments are illustrated as follows:
@@ -123,7 +123,7 @@ The the meanings of the arguments are illustrated as follows:
 * `--alias` is the alias you used to distinguish different experiments.
 * `--mode` is the mode of the envrionment you used to train your model.
 * `--scenario` indicates the power system on which you trained your model.
-* `--reward-type` indicates the voltage loss you used for training.
+* `--voltage-loss-type` indicates the voltage loss you used for training.
 * `--save-path` is the path you saved your model. You just need to give the parent path including the directory `model_save`.
 * `--test-mode` is the test mode you would like to use. There are 2 modes you can use, i.e. `single` and `batch`. 
 * `--test-day` is the day that you would like to do the test. Note that it is only activated if the `--test-mode` is `batch`.
