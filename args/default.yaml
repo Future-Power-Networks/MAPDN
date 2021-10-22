@@ -17,7 +17,7 @@
 "target": True
 "target_lr": 0.1
 "entr": 1.0e-3
-"max_steps": 480 # 240
+"max_steps": 240
 "batch_size": 32 # transition update: steps / episodic update: episodes
 "replay": True
 "replay_buffer_size": 5.0e+3
@@ -26,7 +26,7 @@
 "shared_params": True # agent_id can be switched off if False
 "layernorm": True # add layernorm on the first layer over inputs
 "mixer": False
-"gaussian_policy": True
+"gaussian_policy": False
 "LOG_STD_MIN": 0.0 # activated only if gaussian_policy is True
 "LOG_STD_MAX": 0.5
 "fixed_policy_std": 1.0 # activated if gaussian policy is False, for exploration

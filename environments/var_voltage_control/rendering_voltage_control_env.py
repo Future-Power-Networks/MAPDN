@@ -126,7 +126,7 @@ class Viewer(object):
     def _display_powerloss(self, env):
         powerloss = env._get_res_line_loss().sum()
         label = pyglet.text.Label(
-            f'The total power loss is: \t{powerloss:.3f}',
+            f'The total power loss: \t{powerloss:.3f}',
             font_name="Times New Roman",
             font_size=24,
             bold=True,

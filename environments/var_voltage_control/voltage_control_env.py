@@ -6,7 +6,9 @@ import pandas as pd
 import copy
 import os
 from collections import namedtuple
-from pandapower import plotting as plt
+from .pf_res_plot import pf_res_plotly
+from .voltage_loss.voltage_loss_backend import VoltageLoss
+
 
 
 def convert(dictionary):
@@ -42,7 +44,7 @@ class VoltageControl(MultiAgentEnv):
 
         # define episode and rewards
         self.episode_limit = args.episode_limit
-        self.reward_type = getattr(args, "reward_type", "l1")
+        self.voltage_loss_type = getattr(args, "voltage_loss", "l1")
         self.voltage_weight = getattr(args, "voltage_weight", 1.0)
         self.q_weight = getattr(args, "q_weight", 0.1)
         self.line_weight = getattr(args, "line_weight", None)
@@ -73,6 +75,8 @@ class VoltageControl(MultiAgentEnv):
         self.last_v = self.powergrid.res_bus["vm_pu"].sort_index().to_numpy(copy=True)
         self.last_q = self.powergrid.sgen["q_mvar"].to_numpy(copy=True)
 
+        # initialise voltage loss
+        self.voltage_loss = VoltageLoss(self.voltage_loss_type)
         self._rendering_initialized = False
 
     def reset(self, reset_time=True):
@@ -535,11 +539,12 @@ class VoltageControl(MultiAgentEnv):
     
     def _calc_reward(self, info={}):
         """reward function
-        consider 4 possible choices on voltage loss:
+        consider 5 possible choices on voltage loss:
             l1 loss
             l2 loss
-            liu loss
+            courant_beltrami loss
             bowl loss
+            bump loss
         """
         # percentage of voltage out of control
         v = self.powergrid.res_bus["vm_pu"].sort_index().to_numpy(copy=True)
@@ -563,17 +568,9 @@ class VoltageControl(MultiAgentEnv):
         q_loss = np.mean(np.abs(q))
         info["q_loss"] = q_loss
         # reward function
-        if self.reward_type == "l1":
-            v_loss = np.mean(self.l1_loss(v)) * self.voltage_weight
-        elif self.reward_type == "bowl":
-            v_loss = np.mean(self.bowl_loss(v)) * self.voltage_weight
-        elif self.reward_type == "l2":
-            v_loss = np.mean(self.l2_loss(v)) * self.voltage_weight
-        elif self.reward_type == "liu":
-            v_loss = np.mean(self.liu_loss(v, self.v_lower, self.v_upper)) * self.voltage_weight
-        elif self.reward_type == "bump":
-            v_loss = np.mean(self.bump_loss(v)) * self.voltage_weight
-        # add soft constraint for line or q
+        ## voltage loss
+        v_loss = np.mean(self.voltage_loss.step(v)) * self.voltage_weight
+        ## add soft constraint for line or q
         if self.line_weight != None:
             loss = avg_line_loss * self.line_weight + v_loss
         elif self.q_weight != None:
@@ -589,45 +586,8 @@ class VoltageControl(MultiAgentEnv):
         self.last_v = v
         self.last_q = q
         info["dv_dq"] = norm_dv_dq
-        if "dv_dq" in self.reward_type:
-            loss += -norm_dv_dq * self.dv_dq_weight
         info["destroy"] = 0.0
         return -loss, info
-    
-    def l1_loss(self, vs, v_ref=1.0):
-        def _l1_loss(v):
-            return np.abs( v - v_ref )
-        return np.array([_l1_loss(v) for v in vs])
-
-    def l2_loss(self, vs, v_ref=1.0):
-        def _l2_loss(v):
-            return 2 * np.square(v - v_ref)
-        return np.array([_l2_loss(v) for v in vs])
-
-    def liu_loss(self, vs, v_lower, v_upper):
-        def _liu_loss(v):
-            return np.square(max(0, v - v_upper)) + np.square(max(0, v_lower - v))
-        return np.array([_liu_loss(v) for v in vs])
-
-    def bowl_loss(self, vs, v_ref=1.0, scale=.1):
-        def normal(v, loc, scale):
-            return 1 / np.sqrt(2 * np.pi * scale**2) * np.exp( - 0.5 * np.square(v - loc) / scale**2 )
-        def _bowl_loss(v):
-            if np.abs(v-v_ref) > 0.05:
-                return 2 * np.abs(v-v_ref) - 0.095
-            else:
-                return - 0.01 * normal(v, v_ref, scale) + 0.04
-        return np.array([_bowl_loss(v) for v in vs])
-
-    def bump_loss(self, vs):
-        def _bump_loss(v):
-            if np.abs(v) < 1:
-                return np.exp( - 1 / (1 - v**4) )
-            elif 1 < v < 3:
-                return np.exp( - 1 / (1 - ( v - 2 )**4 ) )
-            else:
-                return 0.0
-        return np.array([_bump_loss(v) for v in vs])
 
     def _get_res_bus_v(self):
         v = self.powergrid.res_bus["vm_pu"].sort_index().to_numpy(copy=True)
@@ -667,5 +627,15 @@ class VoltageControl(MultiAgentEnv):
     def res_pf_plot(self):
         if not os.path.exists("environments/var_voltage_control/plot_save"):
             os.mkdir("environments/var_voltage_control/plot_save")
-        fig = plt.plotly.pf_res_plotly(self.powergrid, aspectratio=(1.0, 1.0), filename="environments/var_voltage_control/plot_save/pf_res_plot.html", auto_open=False)
+        fig = pf_res_plotly(self.powergrid, 
+                            aspectratio=(1.0, 1.0), 
+                            filename="environments/var_voltage_control/plot_save/pf_res_plot.html", 
+                            auto_open=False,
+                            climits_volt=(0.9, 1.1),
+                            line_width=5, 
+                            bus_size=12,
+                            climits_load=(0, 100),
+                            cpos_load=1.1,
+                            cpos_volt=1.0
+                        )
         fig.write_image("environments/var_voltage_control/plot_save/pf_res_plot.jpeg")

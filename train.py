@@ -1,15 +1,13 @@
 import torch as th
 import os
 import argparse
-from collections import namedtuple
-import numpy as np
 import yaml
+from tensorboardX import SummaryWriter
 
 from registry import Model, Strategy
 from environments.var_voltage_control.voltage_control_env import VoltageControl
 from utilities.util import convert, dict2str
 from utilities.trainer import PGTrainer
-from tensorboardX import SummaryWriter
 
 
 
@@ -18,10 +16,9 @@ parser.add_argument("--save-path", type=str, nargs="?", default="./", help="Plea
 parser.add_argument("--alg", type=str, nargs="?", default="maddpg", help="Please enter the alg name.")
 parser.add_argument("--env", type=str, nargs="?", default="var_voltage_control", help="Please enter the env name.")
 parser.add_argument("--alias", type=str, nargs="?", default="", help="Please enter the alias for exp control.")
-parser.add_argument("--difficulty", type=str, nargs="?", default="super_hard", help="Please enter the difficulty level: easy or hard.")
 parser.add_argument("--mode", type=str, nargs="?", default="distributed", help="Please enter the mode: distributed or decentralised.")
-parser.add_argument("--scenario", type=str, nargs="?", default="bus33bw_gu", help="Please input the valid name of an environment scenario.")
-parser.add_argument("--reward-type", type=str, nargs="?", default="l1", help="Please input the valid reward type: l1, liu, l2 or bowl.")
+parser.add_argument("--scenario", type=str, nargs="?", default="bus33_3min_final", help="Please input the valid name of an environment scenario.")
+parser.add_argument("--voltage-loss-type", type=str, nargs="?", default="l1", help="Please input the valid voltage loss type: l1, courant_beltrami, l2, bowl or bump.")
 argv = parser.parse_args()
 
 # load env args
@@ -31,60 +28,22 @@ data_path = env_config_dict["data_path"].split("/")
 data_path[-1] = argv.scenario
 env_config_dict["data_path"] = "/".join(data_path)
 net_topology = argv.scenario
-assert net_topology in ['bus33bw_gu', 'bus141_gu', 'bus322_gu', 'bus33bw_gu_3min', 'bus141_gu_3min', 'bus322_gu_3min'], f'{net_topology} is not a valid scenario.'
-if argv.difficulty == "easy":
-    if argv.scenario in ['bus33bw_gu', 'bus33bw_gu_3min']:
-        env_config_dict["pv_scale"] = 0.5
-        env_config_dict["demand_scale"] = 1.0
-        env_config_dict["action_bias"] = 0.0
-        env_config_dict["action_scale"] = 0.7
-    elif argv.scenario in ['bus141_gu', 'bus141_gu_3min']:
-        env_config_dict["pv_scale"] = 0.5
-        env_config_dict["demand_scale"] = 1.0
-        env_config_dict["action_bias"] = 0.0
-        env_config_dict["action_scale"] = 0.8
-    elif argv.scenario in ['bus322_gu', 'bus322_gu_3min']:
-        env_config_dict["pv_scale"] = 0.5
-        env_config_dict["demand_scale"] = 1.0
-        env_config_dict["action_bias"] = 0.0
-        env_config_dict["action_scale"] = 0.5
-elif argv.difficulty == "hard":
-    if argv.scenario in ['bus33bw_gu', 'bus33bw_gu_3min']:
-        env_config_dict["pv_scale"] = 0.8
-        env_config_dict["demand_scale"] = 1.0
-        env_config_dict["action_bias"] = 0.0
-        env_config_dict["action_scale"] = 0.7
-    elif argv.scenario in ['bus141_gu', 'bus141_gu_3min']:
-        env_config_dict["pv_scale"] = 0.8
-        env_config_dict["demand_scale"] = 1.0
-        env_config_dict["action_bias"] = 0.0
-        env_config_dict["action_scale"] = 0.8
-    elif argv.scenario in ['bus322_gu', 'bus322_gu_3min']:
-        env_config_dict["pv_scale"] = 0.8
-        env_config_dict["demand_scale"] = 1.0
-        env_config_dict["action_bias"] = 0.0
-        env_config_dict["action_scale"] = 0.4
-elif argv.difficulty == "super_hard":
-    if argv.scenario in ['bus33bw_gu', 'bus33bw_gu_3min']:
-        env_config_dict["pv_scale"] = 0.7
-        env_config_dict["demand_scale"] = 0.7
-        env_config_dict["action_bias"] = 0.0
-        env_config_dict["action_scale"] = 0.8
-    elif argv.scenario in ['bus141_gu', 'bus141_gu_3min']:
-        env_config_dict["pv_scale"] = 1.0
-        env_config_dict["demand_scale"] = 1.0
-        env_config_dict["action_bias"] = 0.0
-        env_config_dict["action_scale"] = 0.6
-    elif argv.scenario in ['bus322_gu', 'bus322_gu_3min']:
-        env_config_dict["pv_scale"] = 0.3
-        env_config_dict["demand_scale"] = 0.3
-        env_config_dict["action_bias"] = 0.0
-        env_config_dict["action_scale"] = 0.8
-else:
-    raise RuntimeError("Please input the correct difficulty level, e.g. easy, hard or super_hard.")
+
+# set the action range
+assert net_topology in ['bus33_3min_final', 'bus141_3min_final', 'bus322_3min_final'], f'{net_topology} is not a valid scenario.'
+if argv.scenario == 'bus33_3min_final':
+    env_config_dict["action_bias"] = 0.0
+    env_config_dict["action_scale"] = 0.8
+elif argv.scenario == 'bus141_3min_final':
+    env_config_dict["action_bias"] = 0.0
+    env_config_dict["action_scale"] = 0.6
+elif argv.scenario == 'bus322_3min_final':
+    env_config_dict["action_bias"] = 0.0
+    env_config_dict["action_scale"] = 0.8
+
 assert argv.mode in ['distributed', 'decentralised'], "Please input the correct mode, e.g. distributed or decentralised."
 env_config_dict["mode"] = argv.mode
-env_config_dict["reward_type"] = argv.reward_type
+env_config_dict["voltage_loss_type"] = argv.voltage_loss_type
 
 # load default args
 with open("./args/default.yaml", "r") as f:
@@ -96,7 +55,7 @@ with open("./args/alg_args/" + argv.alg + ".yaml", "r") as f:
     alg_config_dict["action_scale"] = env_config_dict["action_scale"]
     alg_config_dict["action_bias"] = env_config_dict["action_bias"]
 
-log_name = "-".join([argv.env, net_topology, argv.difficulty, argv.mode, argv.alg, argv.reward_type, argv.alias])
+log_name = "-".join([argv.env, net_topology, argv.mode, argv.alg, argv.voltage_loss_type, argv.alias])
 alg_config_dict = {**default_config_dict, **alg_config_dict}
 
 # define envs

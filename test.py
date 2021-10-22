@@ -1,8 +1,5 @@
 import torch
-import os
 import argparse
-from collections import namedtuple
-import numpy as np
 import yaml
 import pickle
 
@@ -10,7 +7,7 @@ from registry import Model, Strategy
 from environments.var_voltage_control.voltage_control_env import VoltageControl
 from utilities.util import convert
 from utilities.tester import PGTester
-from tensorboardX import SummaryWriter
+
 
 
 parser = argparse.ArgumentParser(description="Train rl agent.")
@@ -18,11 +15,12 @@ parser.add_argument("--save-path", type=str, nargs="?", default="./", help="Plea
 parser.add_argument("--alg", type=str, nargs="?", default="maddpg", help="Please enter the alg name.")
 parser.add_argument("--env", type=str, nargs="?", default="var_voltage_control", help="Please enter the env name.")
 parser.add_argument("--alias", type=str, nargs="?", default="", help="Please enter the alias for exp control.")
-parser.add_argument("--difficulty", type=str, nargs="?", default="easy", help="Please enter the difficulty level: easy or hard.")
 parser.add_argument("--mode", type=str, nargs="?", default="distributed", help="Please enter the mode: distributed or decentralised.")
-parser.add_argument("--scenario", type=str, nargs="?", default="bus33bw", help="Please input the valid name of an environment scenario.")
-parser.add_argument("--reward-type", type=str, nargs="?", default="l1", help="Please input the valid reward type: l1, liu, l2 or bowl.")
+parser.add_argument("--scenario", type=str, nargs="?", default="bus33_3min_final", help="Please input the valid name of an environment scenario.")
+parser.add_argument("--voltage-loss-type", type=str, nargs="?", default="l1", help="Please input the valid voltage loss type: l1, courant_beltrami, l2, bowl or bump.")
 parser.add_argument("--test-mode", type=str, nargs="?", default="single", help="Please input the valid test mode: single or batch.")
+parser.add_argument("--test-day", type=int, nargs="?", default=730, help="Please input the day you would test if the test mode is single.")
+parser.add_argument("--render", action="store_true", help="Activate the rendering of the environment.")
 argv = parser.parse_args()
 
 # load env args
@@ -32,53 +30,30 @@ data_path = env_config_dict["data_path"].split("/")
 data_path[-1] = argv.scenario
 env_config_dict["data_path"] = "/".join(data_path)
 net_topology = argv.scenario
-assert net_topology in ['bus33bw_gu', 'bus141_gu', 'bus347_gu'], f'{net_topology} is not a valid scenario.'
-if argv.difficulty == "easy":
-    env_config_dict["pv_scale"] = 0.5
-    env_config_dict["demand_scale"] = 1.0
-    if argv.scenario == 'bus33bw_gu':
-        env_config_dict["action_bias"] = 0.0
-        env_config_dict["action_scale"] = 0.7
-    elif argv.scenario == 'bus141_gu':
-        env_config_dict["action_bias"] = 0.0
-        env_config_dict["action_scale"] = 0.8
-    elif argv.scenario == 'bus347':
-        env_config_dict["action_bias"] = 0.0
-        env_config_dict["action_scale"] = 0.5
-elif argv.difficulty == "hard":
-    env_config_dict["pv_scale"] = 0.8
-    env_config_dict["demand_scale"] = 1.0
-    if argv.scenario == 'bus33bw_gu':
-        env_config_dict["action_bias"] = 0.0
-        env_config_dict["action_scale"] = 0.7
-    elif argv.scenario == 'bus141_gu':
-        env_config_dict["action_bias"] = 0.0
-        env_config_dict["action_scale"] = 0.8
-    elif argv.scenario == 'bus347_gu':
-        env_config_dict["action_bias"] = 0.0
-        env_config_dict["action_scale"] = 0.4
-elif argv.difficulty == "super_hard":
-    env_config_dict["pv_scale"] = 1.0
-    env_config_dict["demand_scale"] = 1.0
-    if argv.scenario == 'bus33bw_gu':
-        env_config_dict["action_bias"] = 0.0
-        env_config_dict["action_scale"] = 0.5
-    elif argv.scenario == 'bus141_gu':
-        env_config_dict["action_bias"] = 0.0
-        env_config_dict["action_scale"] = 0.6
-    elif argv.scenario == 'bus347_gu':
-        env_config_dict["action_bias"] = 0.0
-        env_config_dict["action_scale"] = 0.3
-else:
-    raise RuntimeError("Please input the correct difficulty level, e.g. easy, hard or super_hard.")
+
+# set the action range
+assert net_topology in ['bus33_3min_final', 'bus141_3min_final', 'bus322_3min_final'], f'{net_topology} is not a valid scenario.'
+if argv.scenario == 'bus33_3min_final':
+    env_config_dict["action_bias"] = 0.0
+    env_config_dict["action_scale"] = 0.8
+elif argv.scenario == 'bus141_3min_final':
+    env_config_dict["action_bias"] = 0.0
+    env_config_dict["action_scale"] = 0.6
+elif argv.scenario == 'bus322_3min_final':
+    env_config_dict["action_bias"] = 0.0
+    env_config_dict["action_scale"] = 0.8
+
 assert argv.mode in ['distributed', 'decentralised'], "Please input the correct mode, e.g. distributed or decentralised."
 env_config_dict["mode"] = argv.mode
+env_config_dict["voltage_loss_type"] = argv.voltage_loss_type
 
-env_config_dict["reward_type"] = argv.reward_type
+# for one-day test
+env_config_dict["episode_limit"] = 480
 
 # load default args
 with open("./args/default.yaml", "r") as f:
     default_config_dict = yaml.safe_load(f)
+default_config_dict["max_steps"] = 480
 
 # load alg args
 with open("./args/alg_args/"+argv.alg+".yaml", "r") as f:
@@ -86,7 +61,7 @@ with open("./args/alg_args/"+argv.alg+".yaml", "r") as f:
     alg_config_dict["action_scale"] = env_config_dict["action_scale"]
     alg_config_dict["action_bias"] = env_config_dict["action_bias"]
 
-log_name = "-".join([argv.env, net_topology, argv.difficulty, argv.mode, argv.alg, argv.reward_type, argv.alias])
+log_name = "-".join([argv.env, net_topology, argv.mode, argv.alg, argv.voltage_loss_type, argv.alias])
 alg_config_dict = {**default_config_dict, **alg_config_dict}
 
 # define envs
@@ -121,17 +96,19 @@ behaviour_net.load_state_dict(checkpoint['model_state_dict'])
 print (f"{args}\n")
 
 if strategy == "pg":
-    test = PGTester(args, behaviour_net, env)
+    test = PGTester(args, behaviour_net, env, argv.render)
 elif strategy == "q":
     raise NotImplementedError("This needs to be implemented.")
 else:
     raise RuntimeError("Please input the correct strategy, e.g. pg or q.")
 
 if argv.test_mode == 'single':
-    # record = test.run(199, 23, 2) # (day, hour, quarter)
-    record = test.run(730, 23, 2) # (day, hour, quarter)
+    # record = test.run(199, 23, 2) # (day, hour, 3min)
+    # record = test.run(730, 23, 2) # (day, hour, 3min)
+    record = test.run(argv.test_day, 23, 2)
+    with open('test_record_'+log_name+f'_day{argv.test_day}'+'.pickle', 'wb') as f:
+        pickle.dump(record, f, pickle.HIGHEST_PROTOCOL)
 elif argv.test_mode == 'batch':
     record = test.batch_run(10)
-
-with open('test_record_'+log_name+'_'+argv.test_mode+'.pickle', 'wb') as f:
-    pickle.dump(record, f, pickle.HIGHEST_PROTOCOL)
+    with open('test_record_'+log_name+'_'+argv.test_mode+'.pickle', 'wb') as f:
+        pickle.dump(record, f, pickle.HIGHEST_PROTOCOL)

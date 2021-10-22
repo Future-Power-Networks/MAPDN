@@ -1,4 +1,3 @@
-from collections import namedtuple
 from models.maddpg import MADDPG
 from models.sqddpg import SQDDPG
 from models.iac import IAC
@@ -24,14 +23,14 @@ Model = dict(maddpg=MADDPG,
              facmaddpg=FACMADDPG
             )
 
-Strategy=dict(maddpg='pg',
-              sqddpg='pg',
-              iac='pg',
-              iddpg='pg',
-              coma='pg',
-              maac='pg',
-              matd3='pg',
-              ippo='pg',
-              mappo='pg',
-              facmaddpg='pg'
-             )
+Strategy = dict(maddpg='pg',
+                sqddpg='pg',
+                iac='pg',
+                iddpg='pg',
+                coma='pg',
+                maac='pg',
+                matd3='pg',
+                ippo='pg',
+                mappo='pg',
+                facmaddpg='pg'
+            )
