@@ -105,7 +105,7 @@ python test.py --mode decentralised
 You can execute the following command to train a model on a power system using the following command.
 
 ```
-python train.py --alg matd3 --alias 0 --mode distributed --scenario bus33bw_gu_3min --voltage-loss-type l1 --save-path trial
+python train.py --alg matd3 --alias 0 --mode distributed --scenario bus33_3min_final --voltage-loss-type l1 --save-path trial
 ```
 
 The the meanings of the arguments are illustrated as follows:
@@ -121,7 +121,7 @@ The the meanings of the arguments are illustrated as follows:
 After training, you can exclusively test your model to do the further analysis using the following command.
 
 ```
-python test.py --save-path trial/model_save/bus33bw --alg matd3 --alias 0 --scenario bus33bw_gu_3min --voltage-loss-type l1 --test-mode single --test-day 730 --render
+python test.py --save-path trial/model_save --alg matd3 --alias 0 --scenario bus33_3min_final --voltage-loss-type l1 --test-mode single --test-day 730 --render
 ```
 
 The the meanings of the arguments are illustrated as follows:
