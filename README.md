@@ -6,6 +6,7 @@ This repository provide an environment of distributed/decentralised active volta
 
 The framework of environment implementation follows the multi-agent environment framework provided in [PyMARL](https://github.com/oxwhirl/pymarl/). Therefore, all baselines that are compatible with that framework can be easily applied to this environment.
 
+<br />
 
 ## Brief Introduction of the Task
 
@@ -23,19 +24,20 @@ In this section, we give a brief introduction of this task so that the users can
 * PV Reactive Power,
 * Voltage.
 
-
+<br />
 <figure>
   <img src="img/bus33.png" height="240" weight="720">
   <figcaption>
     Figure 1: Illustration on 33-bus system. Each bus is indexed by a circle with a number. Four control regions are partitioned by the smallest path from the terminal to the main branch (bus 1-6). We control the voltage on bus 2-33 whereas bus 0-1 represent the substation with constant voltage and infinite active and reactive power capacity. G represents an external generator; small Ls represent loads; and emoji of sun represents the location where a PV is installed.
   </figcaption>
 </figure>
-
+<br />
 
 **Reward:** The reward function is shown as follows:
 $$\mathit{r} = - \frac{1}{|V|} \sum_{i \in V} l_{v}(v_{i}) - \alpha \cdot l_{q}(\mathbf{q}^{\scriptscriptstyle PV}),$$
 where $l_{v}(\cdot)$ is voltage loss that measure whether the voltage of a bus is within the safety range; $l_{q}(\mathbf{q}^{\scriptscriptstyle PV})=\frac{1}{|\mathcal{I}|}||\mathbf{q}^{\scriptscriptstyle PV}||\_{1}$ that can be seen as a simple approximation of power loss, where $\mathbf{q}^{\scriptscriptstyle PV}$ is a vector of agents' reactive power, $\mathcal{I}$ is a set of agents and $\alpha$ is a multiplier to adjust the balance between voltage control and the generation of reactive power. In this work, we investigate different forms of $l_{v}(\cdot)$. Literally, the aim of this reward function is controlling the voltage, meanwhile minimising the power loss that is correlated with the economic loss.
 
+<br />
 
 ## Installation of the Dependencies
 
@@ -50,6 +52,7 @@ where $l_{v}(\cdot)$ is voltage loss that measure whether the voltage of a bus i
     conda activate distributed_powernet
     ```
 
+<br />
 
 ## Downloading the Dataset
 
@@ -62,6 +65,7 @@ where $l_{v}(\cdot)$ is voltage loss that measure whether the voltage of a bus i
 3. Go to the directory `[Your own parent path]/distributed-active-voltage-control/environments/var_voltage_control/` and create a folder called `data`.
 4. Move the 3 extracted folders by step 2 to the directory `[Your own parent path]/distributed-active-voltage-control/environments/var_voltage_control/data/`.
 
+<br />
 
 ## Two modes of Tasks
 
@@ -91,6 +95,7 @@ python train.py --mode decentralised
 python test.py --mode decentralised
 ```
 
+<br />
 
 ## Quick Start
 
@@ -129,6 +134,8 @@ The the meanings of the arguments are illustrated as follows:
 * `--test-day` is the day that you would like to do the test. Note that it is only activated if the `--test-mode` is `batch`.
 * `--render` indicates activating the rendering of the environment.
 
+<br />
+
 ## Interaction with Environment
 
 The simple use of the environment is shown as the following codes.
@@ -141,9 +148,13 @@ for t in range(240):
     reward, done, info = env.step(actions, add_noise=False)
 ```
 
+<br />
+
 ## API Usage
 
 For more details for this environment, users can check the upcoming [API Docs]().
+
+<br />
 
 ## Citation
 
