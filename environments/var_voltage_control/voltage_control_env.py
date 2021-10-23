@@ -22,9 +22,18 @@ class ActionSpace(object):
 
 
 class VoltageControl(MultiAgentEnv):
+    """this class is for the environment of distributed active voltage control
+
+       it is easy to interact with the environment, e.g.,
+
+       state, global_state = env.reset()
+       for t in range(240):
+           actions = agents.get_actions() # a vector involving all agents' actions
+           reward, done, info = env.step(actions)
+    """
     def __init__(self, kwargs):
-        '''initialisation
-        '''
+        """initialisation
+        """
         # unpack args
         args = kwargs
         if isinstance(args, dict):
@@ -110,7 +119,7 @@ class VoltageControl(MultiAgentEnv):
                 pp.runpp(self.powergrid)
                 solvable = True
             except ppException:
-                print ("The power flow in the demand and PV renew cannot be solved.")
+                print ("The power flow for the initialisation of demand and PV cannot be solved.")
                 print (f"This is the pv: \n{self.powergrid.sgen['p_mw']}")
                 print (f"This is the q: \n{self.powergrid.sgen['q_mvar']}")
                 print (f"This is the active demand: \n{self.powergrid.load['p_mw']}")
@@ -151,7 +160,7 @@ class VoltageControl(MultiAgentEnv):
                 pp.runpp(self.powergrid)
                 solvable = True
             except ppException:
-                print ("The power flow in the demand and PV renew cannot be solved.")
+                print ("The power flow for the initialisation of demand and PV cannot be solved.")
                 print (f"This is the pv: \n{self.powergrid.sgen['p_mw']}")
                 print (f"This is the q: \n{self.powergrid.sgen['q_mvar']}")
                 print (f"This is the active demand: \n{self.powergrid.load['p_mw']}")
@@ -198,8 +207,7 @@ class VoltageControl(MultiAgentEnv):
 
     def get_state(self):
         """return the global state for the power system
-        the default state: voltage
-        auxiliary state: active power of generators, bus state, load active power, load reactive power
+           the default state: voltage, active power of generators, bus state, load active power, load reactive power
         """
         state = []
         if "demand" in self.state_space:
@@ -218,8 +226,8 @@ class VoltageControl(MultiAgentEnv):
     
     def get_obs(self):
         """return the obs for each agent in the power system
-        the default obs: voltage, active power of generators, bus state, load active power, load reactive power
-        each agent can only observe the state within its zone for both distributed and decentralised mode
+           the default obs: voltage, active power of generators, bus state, load active power, load reactive power
+           each agent can only observe the state within the zone where it belongs
         """
         clusters = self._get_clusters_info()
 
@@ -412,7 +420,7 @@ class VoltageControl(MultiAgentEnv):
     
     def _load_reactive_demand_data(self):
         """load reactive demand data
-        the sensor frequency is set to 3 or 15 mins as default
+        the sensor frequency is set to 3 min as default
         """
         demand_path = os.path.join(self.data_path, 'load_reactive.csv')
         demand = pd.read_csv(demand_path, index_col=None)
@@ -473,7 +481,7 @@ class VoltageControl(MultiAgentEnv):
         return self.reactive_demand_histories[t:t+history, :]
 
     def _set_demand_and_pv(self, add_noise=True):
-        """update the demand and pv production according to the histories with some i.i.d. noise.
+        """optionally update the demand and pv production according to the histories with some i.i.d. gaussian noise
         """ 
         pv = copy.copy(self._get_pv_history()[0, :])
 
@@ -541,7 +549,7 @@ class VoltageControl(MultiAgentEnv):
             pp.runpp(self.powergrid)
             return True
         except ppException:
-            print ("The power flow in the reactive power insert cannot be solved.")
+            print ("The power flow for the reactive power penetration cannot be solved.")
             print (f"This is the pv: \n{self.powergrid.sgen['p_mw']}")
             print (f"This is the q: \n{self.powergrid.sgen['q_mvar']}")
             print (f"This is the active demand: \n{self.powergrid.load['p_mw']}")
@@ -600,16 +608,6 @@ class VoltageControl(MultiAgentEnv):
         else:
             raise NotImplementedError("Please at least give one weight, either q_weight or line_weight.")
         reward = -loss
-
-        # dv/dq
-        q = self.powergrid.res_sgen["q_mvar"].sort_index().to_numpy(copy=True)
-        v_diff = np.repeat(np.expand_dims(v - self.last_v, axis=1), q.shape[0], axis=1) # (v_diff_dim, q_diff_dim)
-        q_diff = np.repeat(np.expand_dims(q - self.last_q, axis=0), v.shape[0], axis=0) # (v_diff_dim, q_diff_dim)
-        dv_dq = v_diff / (q_diff + 1e-7)
-        norm_dv_dq = np.clip(np.mean(np.abs(dv_dq)), 0, 100)
-        self.last_v = v
-        self.last_q = q
-        info["dv_dq"] = norm_dv_dq
 
         # record destroy
         info["destroy"] = 0.0
