@@ -27,9 +27,9 @@ In this section, we give a brief introduction of this task so that the users can
 
 <figure>
   <br />
-  <img src="img/bus33.png" height="240" weight="720">
+  <img src="img/case33.png" height="240" weight="720">
   <figcaption>
-    Figure 1: Illustration on 33-bus system. Each bus is indexed by a circle with a number. Four control regions are partitioned by the smallest path from the terminal to the main branch (bus 1-6). We control the voltage on bus 2-33 whereas bus 0-1 represent the substation with constant voltage and infinite active and reactive power capacity. G represents an external generator; small Ls represent loads; and emoji of sun represents the location where a PV is installed.
+    Figure 1: Illustration on the 33-bus system. Each bus is indexed by a circle with a number. Four control regions are partitioned by the smallest path from the terminal to the main branch (bus 1-6). We control the voltage on bus 2-33 whereas bus 0-1 represent the substation with constant voltage and infinite active and reactive power capacity. G represents an external generator; small Ls represent loads; and emoji of sun represents the location where a PV is installed.
   </figcaption>
   <br /> <br />
 </figure>
@@ -45,11 +45,11 @@ where $l_{v}(\cdot)$ is voltage loss that measure whether the voltage of a bus i
 1. Install [Anaconda](https://www.anaconda.com/products/individual#Downloads).
 2. After cloning or downloading this repository, assure that the current directory is `[your own parent path]/distributed-active-voltage-conrtol`.
 3. Execute the following command. 
-   ```{bash}
-   conda env export > environment.yml
+   ```bash
+   conda env create -f environment.yml
    ```
 4. Activate the installed virtual environment using the following command.
-    ```{bash}
+    ```bash
     conda activate distributed_powernet
     ```
 
@@ -60,9 +60,9 @@ where $l_{v}(\cdot)$ is voltage loss that measure whether the voltage of a bus i
 1. Download the data from the link: https://drive.google.com/file/d/1Z23Z5mZhDcK6bO5tJ-D_WGxM6WpTJuYr/view?usp=sharing.
 2. Unzip the zip file and you can see the following 3 folders:
 
-    * `bus33_3min_final`
-    * `bus141_3min_final`
-    * `bus322_3min_final`
+    * `case33_3min_final`
+    * `case141_3min_final`
+    * `case322_3min_final`
 3. Go to the directory `[Your own parent path]/distributed-active-voltage-control/environments/var_voltage_control/` and create a folder called `data`.
 4. Move the 3 extracted folders by step 2 to the directory `[Your own parent path]/distributed-active-voltage-control/environments/var_voltage_control/data/`.
 
@@ -105,7 +105,7 @@ python test.py --mode decentralised
 You can execute the following command to train a model on a power system using the following command.
 
 ```
-python train.py --alg matd3 --alias 0 --mode distributed --scenario bus33_3min_final --voltage-loss-type l1 --save-path trial
+python train.py --alg matd3 --alias 0 --mode distributed --scenario case33_3min_final --voltage-loss-type l1 --save-path trial
 ```
 
 The the meanings of the arguments are illustrated as follows:
@@ -121,7 +121,7 @@ The the meanings of the arguments are illustrated as follows:
 After training, you can exclusively test your model to do the further analysis using the following command.
 
 ```
-python test.py --save-path trial/model_save --alg matd3 --alias 0 --scenario bus33_3min_final --voltage-loss-type l1 --test-mode single --test-day 730 --render
+python test.py --save-path trial/model_save --alg matd3 --alias 0 --scenario case33_3min_final --voltage-loss-type l1 --test-mode single --test-day 730 --render
 ```
 
 The the meanings of the arguments are illustrated as follows:
