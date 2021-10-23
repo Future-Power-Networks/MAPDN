@@ -57,7 +57,7 @@ where $l_{v}(\cdot)$ is voltage loss that measure whether the voltage of a bus i
 
 ## Downloading the Dataset
 
-1. Download the data from the link: https://drive.google.com/file/d/1Z23Z5mZhDcK6bO5tJ-D_WGxM6WpTJuYr/view?usp=sharing.
+1. Download the data from the [link](https://drive.google.com/file/d/1ry0-K5M-YMw7TcQQYeFb7U-pYvdWKm9A/view?usp=sharing).
 2. Unzip the zip file and you can see the following 3 folders:
 
     * `case33_3min_final`
