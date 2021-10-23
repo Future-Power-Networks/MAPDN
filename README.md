@@ -153,7 +153,7 @@ for t in range(240):
 
 ## API Usage
 
-For more details for this environment, users can check the upcoming [API Docs]().
+For more details of this environment, users can check the upcoming [API Docs]().
 
 <br />
 
