@@ -1,11 +1,5 @@
-"""
-2D rendering of the level based foraging domain
-"""
-
-import math
 import os
 import sys
-
 import numpy as np
 import math
 import six

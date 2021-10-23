@@ -87,6 +87,7 @@ class VoltageControl(MultiAgentEnv):
         self.sum_rewards = 0
         if self.history > 1:
             self.obs_history = {i: [] for i in range(self.n_agents)}
+
         # reset the power grid
         self.powergrid = copy.deepcopy(self.base_powergrid)
         solvable = False
@@ -116,16 +117,21 @@ class VoltageControl(MultiAgentEnv):
                 print (f"This is the reactive demand: \n{self.powergrid.load['q_mvar']}")
                 print (f"This is the res_bus: \n{self.powergrid.res_bus}")
                 solvable = False
+
         return self.get_obs(), self.get_state()
     
     def manual_reset(self, day, hour, interval):
+        """manual reset the initial date
+        """
         # reset the time step, cumulative rewards and obs history
         self.steps = 1
         self.sum_rewards = 0
         if self.history > 1:
             self.obs_history = {i: [] for i in range(self.n_agents)}
+
         # reset the power grid
         self.powergrid = copy.deepcopy(self.base_powergrid)
+
         # reset the time stamp
         self._episode_start_hour = hour
         self._episode_start_day = day
@@ -152,12 +158,14 @@ class VoltageControl(MultiAgentEnv):
                 print (f"This is the reactive demand: \n{self.powergrid.load['q_mvar']}")
                 print (f"This is the res_bus: \n{self.powergrid.res_bus}")
                 solvable = False
+
         return self.get_obs(), self.get_state()
 
     def step(self, actions, add_noise=True):
         """function for the interaction between agent and the env each time step
         """
         last_powergrid = copy.deepcopy(self.powergrid)
+
         # check whether the power balance is unsolvable
         solvable = self._take_action(actions)
         if solvable:
@@ -172,8 +180,10 @@ class VoltageControl(MultiAgentEnv):
             info["destroy"] = 1.
             info["totally_controllable_ratio"] = 0.
             info["q_loss"] = q_loss
+
         # set the pv and demand for the next time step
         self._set_demand_and_pv(add_noise=add_noise)
+
         # terminate if episode_limit is reached
         self.steps += 1
         self.sum_rewards += reward
@@ -183,6 +193,7 @@ class VoltageControl(MultiAgentEnv):
             terminated = False
         if terminated:
             print (f"Episode terminated at time: {self.steps} with return: {self.sum_rewards:2.4f}.")
+
         return reward, terminated, info
 
     def get_state(self):
@@ -207,11 +218,11 @@ class VoltageControl(MultiAgentEnv):
     
     def get_obs(self):
         """return the obs for each agent in the power system
-        the default obs: voltage
-        auxiliary obs: active power of generators, bus state, load active power, load reactive power
+        the default obs: voltage, active power of generators, bus state, load active power, load reactive power
         each agent can only observe the state within its zone for both distributed and decentralised mode
         """
         clusters = self._get_clusters_info()
+
         if self.args.mode == "distributed":
             obs_zone_dict = dict()
             zone_list = list()
@@ -285,6 +296,7 @@ class VoltageControl(MultiAgentEnv):
                 agents_obs_.append(copy.deepcopy(obs_))
                 self.obs_history[i].append(copy.deepcopy(obs))
             agents_obs = agents_obs_
+
         return agents_obs
 
     def get_obs_agent(self, agent_id):
@@ -464,17 +476,21 @@ class VoltageControl(MultiAgentEnv):
         """update the demand and pv production according to the histories with some i.i.d. noise.
         """ 
         pv = copy.copy(self._get_pv_history()[0, :])
+
         # add uncertainty to pv data with unit truncated gaussian (only positive accepted)
         if add_noise:
             pv += self.pv_std * np.abs(np.random.randn(*pv.shape))
         active_demand = copy.copy(self._get_active_demand_history()[0, :])
+
         # add uncertainty to active power of demand data with unit truncated gaussian (only positive accepted)
         if add_noise:
             active_demand += self.active_demand_std * np.abs(np.random.randn(*active_demand.shape))
         reactive_demand = copy.copy(self._get_reactive_demand_history()[0, :])
+
         # add uncertainty to reactive power of demand data with unit truncated gaussian (only positive accepted)
         if add_noise:
             reactive_demand += self.reactive_demand_std * np.abs(np.random.randn(*reactive_demand.shape))
+
         # update the record in the pandapower
         self.powergrid.sgen["p_mw"] = pv
         self.powergrid.load["p_mw"] = active_demand
@@ -510,6 +526,7 @@ class VoltageControl(MultiAgentEnv):
                 pv = self.powergrid.sgen["p_mw"].loc[self.powergrid.sgen["name"] == f"zone{i+1}"]
                 q = self.powergrid.sgen["q_mvar"].loc[self.powergrid.sgen["name"] == f"zone{i+1}"]
                 clusters[f"zone{i+1}"] = (zone_res_buses, pv, q, sgen_res_buses)
+
         return clusters
     
     def _take_action(self, actions):
@@ -518,6 +535,7 @@ class VoltageControl(MultiAgentEnv):
         of each distributed generator
         """
         self.powergrid.sgen["q_mvar"] = self._clip_reactive_power(actions, self.powergrid.sgen["p_mw"])
+
         # solve power flow to get the latest voltage with new reactive power and old deamnd and PV active power
         try:
             pp.runpp(self.powergrid)
@@ -553,20 +571,24 @@ class VoltageControl(MultiAgentEnv):
         info["percentage_of_lower_than_lower_v"] = np.sum(v < self.v_lower) / v.shape[0]
         info["percentage_of_higher_than_upper_v"] = np.sum(v > self.v_upper) / v.shape[0]
         info["totally_controllable_ratio"] = 0. if percent_of_v_out_of_control > 1e-3 else 1.
+
         # voltage violation
         v_ref = 0.5 * (self.v_lower + self.v_upper)
         info["average_voltage_deviation"] = np.mean( np.abs( v - v_ref ) )
         info["average_voltage"] = np.mean(v)
         info["max_voltage_drop_deviation"] = np.max( (v < self.v_lower) * (self.v_lower - v) )
         info["max_voltage_rise_deviation"] = np.max( (v > self.v_upper) * (v - self.v_upper) )
+
         # line loss
         line_loss = np.sum(self.powergrid.res_line["pl_mw"])
         avg_line_loss = np.mean(self.powergrid.res_line["pl_mw"])
         info["total_line_loss"] = line_loss
+
         # reactive power (q) loss
         q = self.powergrid.res_sgen["q_mvar"].sort_index().to_numpy(copy=True)
         q_loss = np.mean(np.abs(q))
         info["q_loss"] = q_loss
+
         # reward function
         ## voltage loss
         v_loss = np.mean(self.voltage_loss.step(v)) * self.voltage_weight
@@ -577,6 +599,8 @@ class VoltageControl(MultiAgentEnv):
             loss = q_loss * self.q_weight + v_loss
         else:
             raise NotImplementedError("Please at least give one weight, either q_weight or line_weight.")
+        reward = -loss
+
         # dv/dq
         q = self.powergrid.res_sgen["q_mvar"].sort_index().to_numpy(copy=True)
         v_diff = np.repeat(np.expand_dims(v - self.last_v, axis=1), q.shape[0], axis=1) # (v_diff_dim, q_diff_dim)
@@ -586,8 +610,11 @@ class VoltageControl(MultiAgentEnv):
         self.last_v = v
         self.last_q = q
         info["dv_dq"] = norm_dv_dq
+
+        # record destroy
         info["destroy"] = 0.0
-        return -loss, info
+
+        return reward, info
 
     def _get_res_bus_v(self):
         v = self.powergrid.res_bus["vm_pu"].sort_index().to_numpy(copy=True)
@@ -615,7 +642,6 @@ class VoltageControl(MultiAgentEnv):
     
     def _init_render(self):
         from .rendering_voltage_control_env import Viewer
-
         self.viewer = Viewer()
         self._rendering_initialized = True
 
@@ -627,6 +653,7 @@ class VoltageControl(MultiAgentEnv):
     def res_pf_plot(self):
         if not os.path.exists("environments/var_voltage_control/plot_save"):
             os.mkdir("environments/var_voltage_control/plot_save")
+
         fig = pf_res_plotly(self.powergrid, 
                             aspectratio=(1.0, 1.0), 
                             filename="environments/var_voltage_control/plot_save/pf_res_plot.html", 
