@@ -151,6 +151,48 @@ for t in range(240):
 
 <br />
 
+## Reproduce the Results in the Paper
+
+Users can easily reproduce the results shown in the paper by running the bash script provided with the default configures provided in this repository, e.g.,
+```bash
+source train_case33.sh 0 l1 reproduction
+```
+```bash
+source train_case33.sh 0 l2 reproduction
+```
+```bash
+source train_case33.sh 0 bowl reproduction
+```
+```bash
+source train_case141.sh 0 l1 reproduction
+```
+```bash
+source train_case141.sh 0 l2 reproduction
+```
+```bash
+source train_case141.sh 0 bowl reproduction
+```
+```bash
+source train_case322.sh 0 l1 reproduction
+```
+```bash
+source train_case322.sh 0 l2 reproduction
+```
+```bash
+source train_case322.sh 0 bowl reproduction
+```
+
+The arguements of the above bash scripts are as follows.
+```bash
+$1: --alias
+$2: --voltage-loss-type
+$3: --save-path
+```
+
+**Note**: these training scripts are based on the assumption that you have **at least** 2 GPUs with 12 GB memory. If the above conditions do not satisfy your own local situation, please manually modify the allocation of GPUs.
+
+<br />
+
 ## API Usage
 
 For more details of this environment, users can check the upcoming [API Docs]().
@@ -158,4 +200,10 @@ For more details of this environment, users can check the upcoming [API Docs]().
 <br />
 
 ## Citation
+
+<br />
+
+## Contact
+
+If you have any issues or any intention of cooperation, please feel free to contact me via `jianhong.wang16@imperial.ac.uk`.
 
