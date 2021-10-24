@@ -1,10 +1,19 @@
 # Multi-Agent Reinforcement Learning for Active Voltage Control on Power Distribution Networks
 
+<p float="left">
+    <img src="img/CAP.jpg" width="51"/>
+    <img src="img/efl.jpg" width="52" hspace="10"/> 
+    <img src="img/imperial-college-london.png" width="200"/>
+    <img src="img/bath.gif" width="125" hspace="10"/>
+</p>
+
+<br />
+
 This is the implementation of the paper [Multi-Agent Reinforcement Learning for Active Voltage Control on Power Distribution Networks]().
 
 This repository provide an environment of distributed/decentralised active voltage control on power distribution networks and a batch of state-of-the-art multi-agent actor-critic algorithms that can be used for training.
 
-The framework of environment implementation follows the multi-agent environment framework provided in [PyMARL](https://github.com/oxwhirl/pymarl/). Therefore, all baselines that are compatible with that framework can be easily applied to this environment.
+The environment implementation follows the multi-agent environment framework provided in [PyMARL](https://github.com/oxwhirl/pymarl/). Therefore, all baselines that are compatible with that framework can be easily applied to this environment.
 
 <br />
 
