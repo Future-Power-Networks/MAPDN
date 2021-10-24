@@ -35,7 +35,7 @@ This repository includes the following components.
 
 <br />
 
-## Brief Introduction of the Task
+## A Brief Introduction of the Task
 
 In this section, we give a brief introduction of this task so that the users can easily understand the objective of this environment. 
 
