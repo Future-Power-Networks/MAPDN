@@ -8,6 +8,24 @@ The framework of environment implementation follows the multi-agent environment 
 
 <br />
 
+## Summary of the Repository
+
+This repository includes the following components.
+
+* An environment of active voltage control (decentralised and distributed);
+
+* A training framework for MARL.
+
+* 10 MARL algorithms;
+
+    * [IAC](https://arxiv.org/abs/1907.05707), [IDDPG](https://arxiv.org/abs/1907.05707), [MADDPG](https://arxiv.org/abs/1706.02275), [SQDDPG](https://arxiv.org/abs/1907.05707), [IPPO](https://arxiv.org/abs/2011.09533), [MAPPO](https://arxiv.org/abs/2103.01955), [MAAC](http://proceedings.mlr.press/v97/iqbal19a.html), [MATD3](https://arxiv.org/abs/1910.01465), [COMA](https://ojs.aaai.org/index.php/AAAI/article/view/11794), and [FacMADDPG](https://arxiv.org/abs/2003.06709).
+
+* 5 voltage losses;
+
+    * Bowl, L1, L2, Courant Beltrami, and Bump.
+
+<br />
+
 ## Brief Introduction of the Task
 
 In this section, we give a brief introduction of this task so that the users can easily understand the objective of this environment. 
@@ -132,7 +150,7 @@ The the meanings of the arguments are illustrated as follows:
 * `--voltage-loss-type` indicates the voltage loss you used for training.
 * `--save-path` is the path you saved your model. You just need to give the parent path including the directory `model_save`.
 * `--test-mode` is the test mode you would like to use. There are 2 modes you can use, i.e. `single` and `batch`. 
-* `--test-day` is the day that you would like to do the test. Note that it is only activated if the `--test-mode` is `batch`.
+* `--test-day` is the day that you would like to do the test. Note that it is only activated if the `--test-mode` is `single`.
 * `--render` indicates activating the rendering of the environment.
 
 <br />
