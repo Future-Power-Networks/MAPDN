@@ -29,7 +29,7 @@ This repository includes the following components.
 
     * [IAC](https://arxiv.org/abs/1907.05707), [IDDPG](https://arxiv.org/abs/1907.05707), [MADDPG](https://arxiv.org/abs/1706.02275), [SQDDPG](https://arxiv.org/abs/1907.05707), [IPPO](https://arxiv.org/abs/2011.09533), [MAPPO](https://arxiv.org/abs/2103.01955), [MAAC](http://proceedings.mlr.press/v97/iqbal19a.html), [MATD3](https://arxiv.org/abs/1910.01465), [COMA](https://ojs.aaai.org/index.php/AAAI/article/view/11794), and [FacMADDPG](https://arxiv.org/abs/2003.06709).
 
-* 5 voltage losses;
+* 5 voltage losses.
 
     * Bowl, L1, L2, Courant Beltrami, and Bump.
 
