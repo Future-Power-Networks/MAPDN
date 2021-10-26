@@ -7,7 +7,7 @@ import copy
 import os
 from collections import namedtuple
 from .pf_res_plot import pf_res_plotly
-from .voltage_loss.voltage_loss_backend import VoltageLoss
+from .voltage_barrier.voltage_barrier_backend import VoltageBarrier
 
 
 
@@ -84,8 +84,8 @@ class VoltageControl(MultiAgentEnv):
         self.last_v = self.powergrid.res_bus["vm_pu"].sort_index().to_numpy(copy=True)
         self.last_q = self.powergrid.sgen["q_mvar"].to_numpy(copy=True)
 
-        # initialise voltage loss
-        self.voltage_loss = VoltageLoss(self.voltage_loss_type)
+        # initialise voltage barrier function
+        self.voltage_barrier = VoltageBarrier(self.voltage_loss_type)
         self._rendering_initialized = False
 
     def reset(self, reset_time=True):
@@ -565,12 +565,12 @@ class VoltageControl(MultiAgentEnv):
     
     def _calc_reward(self, info={}):
         """reward function
-        consider 5 possible choices on voltage loss:
-            l1 loss
-            l2 loss
-            courant_beltrami loss
-            bowl loss
-            bump loss
+        consider 5 possible choices on voltage barrier functions:
+            l1
+            l2
+            courant_beltrami
+            bowl
+            bump
         """
         # percentage of voltage out of control
         v = self.powergrid.res_bus["vm_pu"].sort_index().to_numpy(copy=True)
@@ -598,8 +598,8 @@ class VoltageControl(MultiAgentEnv):
         info["q_loss"] = q_loss
 
         # reward function
-        ## voltage loss
-        v_loss = np.mean(self.voltage_loss.step(v)) * self.voltage_weight
+        ## voltage barrier function
+        v_loss = np.mean(self.voltage_barrier.step(v)) * self.voltage_weight
         ## add soft constraint for line or q
         if self.line_weight != None:
             loss = avg_line_loss * self.line_weight + v_loss

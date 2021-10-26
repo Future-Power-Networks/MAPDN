@@ -18,7 +18,7 @@ parser.add_argument("--env", type=str, nargs="?", default="var_voltage_control",
 parser.add_argument("--alias", type=str, nargs="?", default="", help="Please enter the alias for exp control.")
 parser.add_argument("--mode", type=str, nargs="?", default="distributed", help="Please enter the mode: distributed or decentralised.")
 parser.add_argument("--scenario", type=str, nargs="?", default="bus33_3min_final", help="Please input the valid name of an environment scenario.")
-parser.add_argument("--voltage-loss-type", type=str, nargs="?", default="l1", help="Please input the valid voltage loss type: l1, courant_beltrami, l2, bowl or bump.")
+parser.add_argument("--voltage-barrier-type", type=str, nargs="?", default="l1", help="Please input the valid voltage barrier type: l1, courant_beltrami, l2, bowl or bump.")
 argv = parser.parse_args()
 
 # load env args
@@ -30,20 +30,20 @@ env_config_dict["data_path"] = "/".join(data_path)
 net_topology = argv.scenario
 
 # set the action range
-assert net_topology in ['bus33_3min_final', 'bus141_3min_final', 'bus322_3min_final'], f'{net_topology} is not a valid scenario.'
-if argv.scenario == 'bus33_3min_final':
+assert net_topology in ['case33_3min_final', 'case141_3min_final', 'case322_3min_final'], f'{net_topology} is not a valid scenario.'
+if argv.scenario == 'case33_3min_final':
     env_config_dict["action_bias"] = 0.0
     env_config_dict["action_scale"] = 0.8
-elif argv.scenario == 'bus141_3min_final':
+elif argv.scenario == 'case141_3min_final':
     env_config_dict["action_bias"] = 0.0
     env_config_dict["action_scale"] = 0.6
-elif argv.scenario == 'bus322_3min_final':
+elif argv.scenario == 'case322_3min_final':
     env_config_dict["action_bias"] = 0.0
     env_config_dict["action_scale"] = 0.8
 
 assert argv.mode in ['distributed', 'decentralised'], "Please input the correct mode, e.g. distributed or decentralised."
 env_config_dict["mode"] = argv.mode
-env_config_dict["voltage_loss_type"] = argv.voltage_loss_type
+env_config_dict["voltage_barrier_type"] = argv.voltage_barrier_type
 
 # load default args
 with open("./args/default.yaml", "r") as f:
@@ -55,7 +55,7 @@ with open("./args/alg_args/" + argv.alg + ".yaml", "r") as f:
     alg_config_dict["action_scale"] = env_config_dict["action_scale"]
     alg_config_dict["action_bias"] = env_config_dict["action_bias"]
 
-log_name = "-".join([argv.env, net_topology, argv.mode, argv.alg, argv.voltage_loss_type, argv.alias])
+log_name = "-".join([argv.env, net_topology, argv.mode, argv.alg, argv.voltage_barrier_type, argv.alias])
 alg_config_dict = {**default_config_dict, **alg_config_dict}
 
 # define envs
