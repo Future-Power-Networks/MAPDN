@@ -1,5 +1,3 @@
-# Multi-Agent Reinforcement Learning for Active Voltage Control on Power Distribution Networks (MAPDN)
-
 <p float="left">
     <img src="img/CAP.jpg" width="51"/>
     <img src="img/efl.jpg" width="52" hspace="10"/> 
@@ -8,6 +6,8 @@
 </p>
 
 <br />
+
+# Multi-Agent Reinforcement Learning for Active Voltage Control on Power Distribution Networks (MAPDN)
 
 This is the implementation of the paper [Multi-Agent Reinforcement Learning for Active Voltage Control on Power Distribution Networks]().
 
