@@ -70,14 +70,14 @@ where $l_{v}(\cdot)$ is a voltage barrier function that measures whether the vol
 ## Installation of the Dependencies
 
 1. Install [Anaconda](https://www.anaconda.com/products/individual#Downloads).
-2. After cloning or downloading this repository, assure that the current directory is `[your own parent path]/distributed-active-voltage-conrtol`.
+2. After cloning or downloading this repository, assure that the current directory is `[your own parent path]/MAPDN`.
 3. Execute the following command. 
    ```bash
    conda env create -f environment.yml
    ```
 4. Activate the installed virtual environment using the following command.
     ```bash
-    conda activate distributed_powernet
+    conda activate mapdn
     ```
 
 <br />
@@ -90,8 +90,8 @@ where $l_{v}(\cdot)$ is a voltage barrier function that measures whether the vol
     * `case33_3min_final`
     * `case141_3min_final`
     * `case322_3min_final`
-3. Go to the directory `[Your own parent path]/distributed-active-voltage-control/environments/var_voltage_control/` and create a folder called `data`.
-4. Move the 3 extracted folders by step 2 to the directory `[Your own parent path]/distributed-active-voltage-control/environments/var_voltage_control/data/`.
+3. Go to the directory `[Your own parent path]/MAPDN/environments/var_voltage_control/` and create a folder called `data`.
+4. Move the 3 extracted folders by step 2 to the directory `[Your own parent path]/MAPDN/environments/var_voltage_control/data/`.
 
 <br />
 
@@ -217,6 +217,27 @@ $3: --save-path
 ```
 
 **Note**: these training scripts are based on the assumption that you have **at least** 2 GPUs with 12 GB memory. If the above conditions do not satisfy your own local situation, please manually modify the allocation of GPUs. The results in the paper are produced by Geforce RTX 2080Ti.
+
+<br />
+
+## Traditional Control
+
+### Downloading Date
+
+1. Download the data from the [link](https://drive.google.com/file/d/1UOzhcQu-1v5GgW_p-TJewZloV5Di8dPA/view?usp=sharing).
+2. Extract the case files and move them to the directory `[Your own parent path]/MAPDN/traditional_control`.
+
+### Running
+
+The traditional control methods are implemented by Matlab, empowered by [MATPOWER](https://matpower.org/). Please ensure that the latest version of MATPOWER is installed before the next execution.
+
+* Reproduce the results for droop control by running the file `pf_droop_matpower_all.m`.
+
+* Reproduce the results for OPF by running the file `opf_matpower_all.m`.
+
+See the annotation in the files for more details.
+
+
 
 <br />
 

@@ -1,4 +1,4 @@
-name: distributed_powernet
+name: mapdn
 channels:
   - conda-forge
   - defaults
