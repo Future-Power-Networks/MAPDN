@@ -1,4 +1,4 @@
-# Multi-Agent Reinforcement Learning for Active Voltage Control on Power Distribution Networks
+# Multi-Agent Reinforcement Learning for Active Voltage Control on Power Distribution Networks (MAPDN)
 
 <p float="left">
     <img src="img/CAP.jpg" width="51"/>
@@ -11,7 +11,7 @@
 
 This is the implementation of the paper [Multi-Agent Reinforcement Learning for Active Voltage Control on Power Distribution Networks]().
 
-This repository provide an environment of distributed/decentralised active voltage control on power distribution networks and a batch of state-of-the-art multi-agent actor-critic algorithms that can be used for training.
+**MAPDN** is an environment of distributed/decentralised active voltage control on power distribution networks and a batch of state-of-the-art multi-agent actor-critic algorithms that can be used for training.
 
 The environment implementation follows the multi-agent environment framework provided in [PyMARL](https://github.com/oxwhirl/pymarl/). Therefore, all baselines that are compatible with that framework can be easily applied to this environment.
 
