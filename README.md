@@ -249,6 +249,16 @@ For more details of this environment, users can check the upcoming [API Docs]().
 
 ## Citation
 
+```
+@misc{wang2021multiagent,
+      title={Multi-Agent Reinforcement Learning for Active Voltage Control on Power Distribution Networks}, 
+      author={Jianhong Wang and Wangkun Xu and Yunjie Gu and Wenbin Song and Tim C. Green},
+      year={2021},
+      eprint={2110.14300},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG}
+}
+```
 <br />
 
 ## Contact
