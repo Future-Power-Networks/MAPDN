@@ -7,7 +7,7 @@
 
 # Multi-Agent Reinforcement Learning for Active Voltage Control on Power Distribution Networks (MAPDN)
 
-This is the implementation of the paper [Multi-Agent Reinforcement Learning for Active Voltage Control on Power Distribution Networks]().
+This is the implementation of the paper [Multi-Agent Reinforcement Learning for Active Voltage Control on Power Distribution Networks](https://arxiv.org/abs/2110.14300).
 
 **MAPDN** is an environment of distributed/decentralised active voltage control on power distribution networks and a batch of state-of-the-art multi-agent actor-critic algorithms that can be used for training.
 
@@ -248,6 +248,8 @@ For more details of this environment, users can check the upcoming [API Docs]().
 <br />
 
 ## Citation
+
+If you would use this environment or part of this work, please cite the following paper.
 
 ```
 @misc{wang2021multiagent,
