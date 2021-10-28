@@ -21,7 +21,7 @@ This repository includes the following components.
 
 * An environment of active voltage control (decentralised and distributed);
 
-* A training framework for MARL.
+* A training framework for MARL;
 
 * 10 MARL algorithms;
 
