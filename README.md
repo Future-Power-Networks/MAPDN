@@ -99,7 +99,7 @@ where $l_{v}(\cdot)$ is a voltage barrier function that measures whether the vol
 
 ### Background
 
-There are 2 modes of tasks included in this environment, i.e. distributed active voltage control and decentralised active voltage control. Distributed active voltage control is the task introduced in the paper [Multi-Agent Reinforcement Learning for Active Voltage Control on Power Distribution Networks](), whereas Decentralised active voltage control is the task that most of the prior works considered. The primary difference between these 2 modes of tasks are that in decentralised active voltage control the equipments in each zone are controlled by an agent, while in distributed active voltage control each equipment is controlled by an agent (see Figure 1).
+There are 2 modes of tasks included in this environment, i.e. distributed active voltage control and decentralised active voltage control. Distributed active voltage control is the task introduced in the paper [Multi-Agent Reinforcement Learning for Active Voltage Control on Power Distribution Networks](https://arxiv.org/abs/2110.14300), whereas Decentralised active voltage control is the task that most of the prior works considered. The primary difference between these 2 modes of tasks are that in decentralised active voltage control the equipments in each zone are controlled by an agent, while in distributed active voltage control each equipment is controlled by an agent (see Figure 1).
 
 ### How to use?
 
