@@ -220,6 +220,19 @@ $3: --save-path
 
 <br />
 
+## Brief Introduction of Scenarios
+
+We show the basic settings of all scenarios provided in this repository.
+
+| Scenario | No. Loads | No. Regions | No. PVs (Agents) | $p_{\text{max}}^{\scriptscriptstyle{L}}$ | $p_{\text{max}}^{\scriptscriptstyle{PV}}$ |
+| -------- | -------- | -------- | -------- | -------- | -------- |
+| Case33     | 32     | 4     | 6     | 3.5 MW | 8.75 MW |
+| Case141     | 84     | 9     | 22     | 20 MW | 80 MW |
+| Case322     | 337     | 22     | 38     | 1.5 MW | 3.75 MW |
+
+
+<br />
+
 ## Traditional Control
 
 ### Downloading Date
