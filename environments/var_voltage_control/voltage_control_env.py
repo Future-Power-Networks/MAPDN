@@ -65,7 +65,7 @@ class VoltageControl(MultiAgentEnv):
         self.active_demand_std = self.active_demand_data.values.std(axis=0) / 100.0
         self.reactive_demand_std = self.reactive_demand_data.values.std(axis=0) / 100.0
         self.pv_std = self.pv_data.values.std(axis=0) / 100.0
-        self._set_reactive_power_boundry()
+        self._set_reactive_power_boundary()
 
         # define action space and observation space
         self.action_space = ActionSpace(low=-self.args.action_scale+self.args.action_bias, high=self.args.action_scale+self.args.action_bias)
@@ -504,7 +504,7 @@ class VoltageControl(MultiAgentEnv):
         self.powergrid.load["p_mw"] = active_demand
         self.powergrid.load["q_mvar"] = reactive_demand
 
-    def _set_reactive_power_boundry(self):
+    def _set_reactive_power_boundary(self):
         """set the boundary of reactive power
         """
         self.factor = 1.2
