@@ -256,7 +256,7 @@ See the annotation in the files for more details.
 
 ## API Usage
 
-For more details of this environment, users can check the upcoming [API Docs](https://github.com/Future-Power-Networks/MAPDN/wiki/Environments).
+For more details of this environment, users can check the [API Docs](https://github.com/Future-Power-Networks/MAPDN/wiki/Environments).
 
 <br />
 
