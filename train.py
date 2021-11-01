@@ -4,7 +4,7 @@ import argparse
 import yaml
 from tensorboardX import SummaryWriter
 
-from registry import Model, Strategy
+from models.model_registry import Model, Strategy
 from environments.var_voltage_control.voltage_control_env import VoltageControl
 from utilities.util import convert, dict2str
 from utilities.trainer import PGTrainer

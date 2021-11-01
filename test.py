@@ -3,7 +3,7 @@ import argparse
 import yaml
 import pickle
 
-from registry import Model, Strategy
+from models.model_registry import Model, Strategy
 from environments.var_voltage_control.voltage_control_env import VoltageControl
 from utilities.util import convert
 from utilities.tester import PGTester

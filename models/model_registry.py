@@ -1,13 +1,13 @@
-from models.maddpg import MADDPG
-from models.sqddpg import SQDDPG
-from models.iac import IAC
-from models.iddpg import IDDPG
-from models.coma import COMA
-from models.maac import MAAC
-from models.matd3 import MATD3
-from models.ippo import IPPO
-from models.mappo import MAPPO
-from models.facmaddpg import FACMADDPG
+from .maddpg import MADDPG
+from .sqddpg import SQDDPG
+from .iac import IAC
+from .iddpg import IDDPG
+from .coma import COMA
+from .maac import MAAC
+from .matd3 import MATD3
+from .ippo import IPPO
+from .mappo import MAPPO
+from .facmaddpg import FACMADDPG
 
 
 
