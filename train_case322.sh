@@ -1,3 +1,9 @@
+if [ ! -d $3 ]
+then
+  mkdir $3
+fi
+
+
 export CUDA_VISIBLE_DEVICES=0
 nohup python train.py --alg coma --alias $1 --mode distributed --scenario case322_3min_final --voltage-barrier-type $2 --save-path $3 > coma_322_$1_$2.out &
 export CUDA_VISIBLE_DEVICES=0
