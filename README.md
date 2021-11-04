@@ -174,7 +174,7 @@ state, global_state = env.reset()
 for t in range(240):
     actions = agents.get_actions(state) # a vector involving all agents' actions
     reward, done, info = env.step(actions)
-    next_state = trainer.env.get_obs()
+    next_state = env.get_obs()
     state = next_state
 ```
 
