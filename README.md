@@ -214,7 +214,7 @@ source train_case322.sh 0 bowl reproduction
 The arguements of the above bash scripts are as follows.
 ```bash
 $1: --alias
-$2: --voltage-loss-type
+$2: --voltage-barrier-type
 $3: --save-path
 ```
 
