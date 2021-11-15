@@ -71,9 +71,13 @@ where $l_{v}(\cdot)$ is a voltage barrier function that measures whether the vol
 
 1. Install [Anaconda](https://www.anaconda.com/products/individual#Downloads).
 2. After cloning or downloading this repository, assure that the current directory is `[your own parent path]/MAPDN`.
-3. Execute the following command. 
+3. If you are on Linux OS (e.g. Ubuntu), please execute the following command. 
    ```bash
    conda env create -f environment.yml
+   ```
+   If you are on Windows OS, please execute the following command. 
+   ```bash
+   conda env create -f environment_win.yml
    ```
 4. Activate the installed virtual environment using the following command.
     ```bash
