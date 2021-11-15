@@ -32,7 +32,6 @@ dependencies:
   - jupyterlab=2.2.8
   - jupyterlab_pygments=0.1.2
   - jupyterlab_server=1.2.0
-  - ld_impl_linux-64=2.33.1
   - libedit=3.1.20191231
   - libffi=3.3
   - libgcc-ng=9.1.0
