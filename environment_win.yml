@@ -32,12 +32,9 @@ dependencies:
   - jupyterlab=2.2.8
   - jupyterlab_pygments=0.1.2
   - jupyterlab_server=1.2.0
-  - libedit=3.1.20191231
   - libffi=3.3
-  - libgcc-ng=9.1.0
   - libllvm10=10.0.1
   - libsodium=1.0.18
-  - libstdcxx-ng=9.1.0
   - llvmlite=0.34.0
   - markupsafe=1.1.1
   - mistune=0.8.4
@@ -48,7 +45,6 @@ dependencies:
   - nbclient=0.5.1
   - nbconvert=6.0.7
   - nbformat=5.0.8
-  - ncurses=6.2
   - nest-asyncio=1.4.1
   - notebook=6.1.4
   - numba=0.51.2
@@ -64,7 +60,6 @@ dependencies:
   - pysocks=1.7.1
   - python=3.7.9
   - python_abi=3.7
-  - readline=8.0
   - requests=2.24.0
   - send2trash=1.5.0
   - simplegeneric=0.8.1
