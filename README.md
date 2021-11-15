@@ -75,7 +75,7 @@ where $l_{v}(\cdot)$ is a voltage barrier function that measures whether the vol
    ```bash
    conda env create -f environment.yml
    ```
-   If you are on Windows OS, please execute the following command. 
+   If you are on Windows OS, please execute the following command. **Note that please launch the Anaconda shell by the permission of Administration.**
    ```bash
    conda env create -f environment_win.yml
    ```
