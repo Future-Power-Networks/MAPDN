@@ -24,12 +24,14 @@ class ActionSpace(object):
 class VoltageControl(MultiAgentEnv):
     """this class is for the environment of distributed active voltage control
 
-       it is easy to interact with the environment, e.g.,
+        it is easy to interact with the environment, e.g.,
 
-       state, global_state = env.reset()
-       for t in range(240):
-           actions = agents.get_actions() # a vector involving all agents' actions
-           reward, done, info = env.step(actions)
+        state, global_state = env.reset()
+        for t in range(240):
+            actions = agents.get_actions(state) # a vector involving all agents' actions
+            reward, done, info = env.step(actions)
+            next_state = env.get_obs()
+            state = next_state
     """
     def __init__(self, kwargs):
         """initialisation
