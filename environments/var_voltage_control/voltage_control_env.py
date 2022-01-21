@@ -244,8 +244,8 @@ class VoltageControl(MultiAgentEnv):
                 if not( zone in obs_zone_dict.keys() ):
                     if "demand" in self.state_space:
                         copy_zone_buses = copy.deepcopy(zone_buses)
-                        copy_zone_buses.loc[sgen_bus]["p_mw"] -= pv
-                        copy_zone_buses.loc[sgen_bus]["q_mvar"] -= q
+                        copy_zone_buses.loc[sgen_bus]["p_mw"] += pv
+                        copy_zone_buses.loc[sgen_bus]["q_mvar"] += q
                         obs += list(copy_zone_buses.loc[:, "p_mw"].to_numpy(copy=True))
                         obs += list(copy_zone_buses.loc[:, "q_mvar"].to_numpy(copy=True))
                     if "pv" in self.state_space:
@@ -273,8 +273,8 @@ class VoltageControl(MultiAgentEnv):
                 obs = list()
                 if "demand" in self.state_space:
                     copy_zone_buses = copy.deepcopy(zone_buses)
-                    copy_zone_buses.loc[sgen_buses]["p_mw"] -= pv
-                    copy_zone_buses.loc[sgen_buses]["q_mvar"] -= q
+                    copy_zone_buses.loc[sgen_buses]["p_mw"] += pv
+                    copy_zone_buses.loc[sgen_buses]["q_mvar"] += q
                     obs += list(copy_zone_buses.loc[:, "p_mw"].to_numpy(copy=True))
                     obs += list(copy_zone_buses.loc[:, "q_mvar"].to_numpy(copy=True))
                 if "pv" in self.state_space:
