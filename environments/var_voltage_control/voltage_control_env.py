@@ -55,7 +55,7 @@ class VoltageControl(MultiAgentEnv):
 
         # define episode and rewards
         self.episode_limit = args.episode_limit
-        self.voltage_loss_type = getattr(args, "voltage_loss", "l1")
+        self.voltage_barrier_type = getattr(args, "voltage_barrier_type", "l1")
         self.voltage_weight = getattr(args, "voltage_weight", 1.0)
         self.q_weight = getattr(args, "q_weight", 0.1)
         self.line_weight = getattr(args, "line_weight", None)
@@ -87,7 +87,7 @@ class VoltageControl(MultiAgentEnv):
         self.last_q = self.powergrid.sgen["q_mvar"].to_numpy(copy=True)
 
         # initialise voltage barrier function
-        self.voltage_barrier = VoltageBarrier(self.voltage_loss_type)
+        self.voltage_barrier = VoltageBarrier(self.voltage_barrier_type)
         self._rendering_initialized = False
 
     def reset(self, reset_time=True):
