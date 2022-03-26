@@ -85,10 +85,10 @@ class MATD3(Model):
 
         return th.cat([values1, values2], dim=0)
 
-    def get_actions(self, state, status, exploration, actions_avail, target=False, last_hid=None):
+    def get_actions(self, obs, status, exploration, actions_avail, target=False, last_hid=None, clip=False):
         target_policy = self.target_net.policy if self.args.target else self.policy
         if self.args.continuous:
-            means, log_stds, hiddens = self.policy(state, last_hid=last_hid) if not target else target_policy(state, last_hid=last_hid)
+            means, log_stds, hiddens = self.policy(obs, last_hid=last_hid) if not target else target_policy(obs, last_hid=last_hid)
             means[actions_avail == 0] = 0.0
             log_stds[actions_avail == 0] = 0.0
             if means.size(-1) > 1:
@@ -97,12 +97,12 @@ class MATD3(Model):
             else:
                 means_ = means
                 log_stds_ = log_stds
-            actions, log_prob_a = select_action(self.args, means_, status=status, exploration=exploration, info={'clip': target, 'log_std': log_stds_})
+            actions, log_prob_a = select_action(self.args, means_, status=status, exploration=exploration, info={'clip': clip, 'log_std': log_stds_})
             restore_mask = 1. - (actions_avail == 0).to(self.device).float()
             restore_actions = restore_mask * actions
             action_out = (means, log_stds)
         else:
-            logits, _, hiddens = self.policy(state, last_hid=last_hid) if not target else target_policy(state, last_hid=last_hid)
+            logits, _, hiddens = self.policy(obs, last_hid=last_hid) if not target else target_policy(obs, last_hid=last_hid)
             logits[actions_avail == 0] = -9999999
             # this follows the original version of sac: sampling actions
             actions, log_prob_a = select_action(self.args, logits, status=status, exploration=exploration)
@@ -111,26 +111,31 @@ class MATD3(Model):
         return actions, restore_actions, log_prob_a, action_out, hiddens
 
     def get_loss(self, batch):
-        batch_size = len(batch.state)
-        state, actions, old_log_prob_a, old_values, old_next_values, rewards, next_state, done, last_step, actions_avail, last_hids, hids = self.unpack_data(batch)
-        _, actions_pol, log_prob_a, action_out, _ = self.get_actions(state, status='train', exploration=False, actions_avail=actions_avail, target=False, last_hid=last_hids)
-        # _, next_actions, _, _, _ = self.get_actions(next_state, status='train', exploration=True, actions_avail=actions_avail, target=True, last_hid=hids)
+        batch_size = len(batch.obs)
+        obs, state, actions, old_log_prob_a, old_values, old_next_values, \
+        rewards, next_obs, next_state, done, last_step, actions_avail, \
+            last_hid_policy, hid_policy, last_hid_value, hid_value = self.unpack_data(batch)
+        _, actions_pol, log_prob_a, action_out, _ = self.get_actions(obs, status='train', exploration=False, \
+            actions_avail=actions_avail, target=False, last_hid=last_hid_policy)
+        # _, next_actions, _, _, _ = self.get_actions(next_obs, status='train', exploration=True, actions_avail=actions_avail, target=True, last_hid=hids)
         if self.args.double_q:
-            _, next_actions, _, _, _ = self.get_actions(next_state, status='train', exploration=True, actions_avail=actions_avail, target=False, last_hid=hids)
+            _, next_actions, _, _, _ = self.get_actions(next_obs, status='train', exploration=True, \
+                actions_avail=actions_avail, target=False, last_hid=hid_policy, clip=True)
         else:
-            _, next_actions, _, _, _ = self.get_actions(next_state, status='train', exploration=True, actions_avail=actions_avail, target=True, last_hid=hids)
-        compose_pol = self.value(state, actions_pol)
+            _, next_actions, _, _, _ = self.get_actions(next_obs, status='train', exploration=True, \
+                actions_avail=actions_avail, target=True, last_hid=hid_policy, clip=True)
+        compose_pol, _ = self.value(state, obs, actions_pol, last_hid_value)
         values_pol = compose_pol[:batch_size, :]
         values_pol = values_pol.contiguous().view(-1, self.n_)
-        compose = self.value(state, actions)
+        compose, _ = self.value(state, obs, actions, last_hid_value)
         values1, values2 = compose[:batch_size, :], compose[batch_size:, :]
         values1 = values1.contiguous().view(-1, self.n_)
         values2 = values2.contiguous().view(-1, self.n_)
-        next_compose = self.target_net.value(next_state, next_actions.detach())
+        next_compose, _ = self.target_net.value(next_state, next_obs, next_actions.detach(), hid_value)
         next_values1, next_values2 = next_compose[:batch_size, :], next_compose[batch_size:, :]
         next_values1 = next_values1.contiguous().view(-1, self.n_)
         next_values2 = next_values2.contiguous().view(-1, self.n_)
-        returns = th.zeros((batch_size, self.n_), dtype=th.float).to(self.device)
+        returns = th.zeros((batch_size, self.n_), dtype=th.float, device=self.device)
         assert values_pol.size() == next_values1.size() == next_values2.size()
         assert returns.size() == values1.size() == values2.size()
         # update twin values by the minimized target q

@@ -34,13 +34,31 @@ class SQDDPG(Model):
         self.construct_policy_net()
 
     def sample_grandcoalitions(self, batch_size):
-        seq_set = th.tril(th.ones(self.n_, self.n_), diagonal=0, out=None).to(self.device)
-        grand_coalitions = th.multinomial(th.ones(batch_size*self.sample_size, self.n_)/self.n_, self.n_, replacement=False).to(self.device)
-        individual_map = th.zeros(batch_size*self.sample_size*self.n_, self.n_).to(self.device)
-        individual_map.scatter_(1, grand_coalitions.contiguous().view(-1, 1), 1)
+        seq_set = th.tril(th.ones(self.n_, self.n_, device=self.device), diagonal=0, out=None)
+        agent_importance_vec = self.agent_importance_vec.unsqueeze(0).expand(batch_size*self.sample_size, self.n_)
+        grand_coalitions_pos = th.multinomial(agent_importance_vec, self.n_, replacement=False) # shape = (b*n_s, n)
+        individual_map = th.zeros((batch_size*self.sample_size*self.n_, self.n_), device=self.device)
+        individual_map.scatter_(1, grand_coalitions_pos.contiguous().view(-1, 1), 1)
         individual_map = individual_map.contiguous().view(batch_size, self.sample_size, self.n_, self.n_)
         subcoalition_map = th.matmul(individual_map, seq_set)
-        grand_coalitions = grand_coalitions.unsqueeze(1).expand(batch_size*self.sample_size, self.n_, self.n_).contiguous().view(batch_size, self.sample_size, self.n_, self.n_) # shape = (b, n_s, n, n)
+
+        # FIX: construct the grand coalition (in sequence by agent_idx) from the grand_coalitions_pos (e.g., pos_idx <- grand_coalitions_pos[agent_idx])
+        # grand_coalitions = []
+        # for grand_coalition_pos in grand_coalitions_pos:
+        #     grand_coalition = th.zeros_like(grand_coalition_pos)
+        #     for agent, pos in enumerate(grand_coalition_pos):
+        #         grand_coalition[pos] = agent
+        #     grand_coalitions.append(grand_coalition)
+        # grand_coalitions = th.stack(grand_coalitions, dim=0).to(self.device)
+        offset = (th.arange(batch_size*self.sample_size, device=self.device)*self.n_).reshape(-1, 1)
+        grand_coalitions_pos_alter = grand_coalitions_pos + offset
+        grand_coalitions = th.zeros_like(grand_coalitions_pos_alter.flatten(), device=self.device)
+        grand_coalitions[grand_coalitions_pos_alter.flatten()] = th.arange(batch_size*self.sample_size*self.n_, device=self.device)
+        grand_coalitions = grand_coalitions.reshape(batch_size*self.sample_size, self.n_) - offset
+
+        grand_coalitions = grand_coalitions.unsqueeze(1).expand(batch_size*self.sample_size, \
+            self.n_, self.n_).contiguous().view(batch_size, self.sample_size, self.n_, self.n_) # shape = (b, n_s, n, n)
+
         return subcoalition_map, grand_coalitions, individual_map
 
     def marginal_contribution(self, obs, act):
