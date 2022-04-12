@@ -111,27 +111,25 @@ class MATD3(Model):
         return actions, restore_actions, log_prob_a, action_out, hiddens
 
     def get_loss(self, batch):
-        batch_size = len(batch.obs)
-        obs, state, actions, old_log_prob_a, old_values, old_next_values, \
-        rewards, next_obs, next_state, done, last_step, actions_avail, \
-            last_hid_policy, hid_policy, last_hid_value, hid_value = self.unpack_data(batch)
-        _, actions_pol, log_prob_a, action_out, _ = self.get_actions(obs, status='train', exploration=False, \
-            actions_avail=actions_avail, target=False, last_hid=last_hid_policy)
+        batch_size = len(batch.state)
+        state, actions, old_log_prob_a, old_values, old_next_values, rewards, next_state, done, last_step, actions_avail, last_hids, hids = self.unpack_data(batch)
+        _, actions_pol, log_prob_a, action_out, _ = self.get_actions(state, status='train', exploration=False, \
+            actions_avail=actions_avail, target=False, last_hid=last_hids)
         # _, next_actions, _, _, _ = self.get_actions(next_obs, status='train', exploration=True, actions_avail=actions_avail, target=True, last_hid=hids)
         if self.args.double_q:
-            _, next_actions, _, _, _ = self.get_actions(next_obs, status='train', exploration=True, \
-                actions_avail=actions_avail, target=False, last_hid=hid_policy, clip=True)
+            _, next_actions, _, _, _ = self.get_actions(next_state, status='train', exploration=True, \
+                actions_avail=actions_avail, target=False, last_hid=hids, clip=True)
         else:
-            _, next_actions, _, _, _ = self.get_actions(next_obs, status='train', exploration=True, \
-                actions_avail=actions_avail, target=True, last_hid=hid_policy, clip=True)
-        compose_pol, _ = self.value(state, obs, actions_pol, last_hid_value)
+            _, next_actions, _, _, _ = self.get_actions(next_state, status='train', exploration=True, \
+                actions_avail=actions_avail, target=True, last_hid=hids, clip=True)
+        compose_pol, _ = self.value(state, state, actions_pol)
         values_pol = compose_pol[:batch_size, :]
         values_pol = values_pol.contiguous().view(-1, self.n_)
-        compose, _ = self.value(state, obs, actions, last_hid_value)
+        compose, _ = self.value(state, state, actions)
         values1, values2 = compose[:batch_size, :], compose[batch_size:, :]
         values1 = values1.contiguous().view(-1, self.n_)
         values2 = values2.contiguous().view(-1, self.n_)
-        next_compose, _ = self.target_net.value(next_state, next_obs, next_actions.detach(), hid_value)
+        next_compose, _ = self.target_net.value(next_state, next_state, next_actions.detach())
         next_values1, next_values2 = next_compose[:batch_size, :], next_compose[batch_size:, :]
         next_values1 = next_values1.contiguous().view(-1, self.n_)
         next_values2 = next_values2.contiguous().view(-1, self.n_)
