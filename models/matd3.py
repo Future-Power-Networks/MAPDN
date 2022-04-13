@@ -122,14 +122,14 @@ class MATD3(Model):
         else:
             _, next_actions, _, _, _ = self.get_actions(next_state, status='train', exploration=True, \
                 actions_avail=actions_avail, target=True, last_hid=hids, clip=True)
-        compose_pol, _ = self.value(state, state, actions_pol)
+        compose_pol = self.value(state, actions_pol)
         values_pol = compose_pol[:batch_size, :]
         values_pol = values_pol.contiguous().view(-1, self.n_)
-        compose, _ = self.value(state, state, actions)
+        compose = self.value(state, actions)
         values1, values2 = compose[:batch_size, :], compose[batch_size:, :]
         values1 = values1.contiguous().view(-1, self.n_)
         values2 = values2.contiguous().view(-1, self.n_)
-        next_compose, _ = self.target_net.value(next_state, next_state, next_actions.detach())
+        next_compose = self.target_net.value(next_state, next_actions.detach())
         next_values1, next_values2 = next_compose[:batch_size, :], next_compose[batch_size:, :]
         next_values1 = next_values1.contiguous().view(-1, self.n_)
         next_values2 = next_values2.contiguous().view(-1, self.n_)
