@@ -264,6 +264,8 @@ See the annotation in the files for more details.
 
 For more details of this environment, users can check the [API Docs](https://github.com/Future-Power-Networks/MAPDN/wiki/Environments).
 
+<br />
+
 ## Build Up Networks
 
 For building up new networks, we provide an open-source codebase to produce case33 and case141 in this [repo](https://github.com/xuwkk/gen_pandapower_pv).
