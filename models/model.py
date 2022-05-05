@@ -225,7 +225,7 @@ class Model(nn.Module):
             done_ = done or t==self.args.max_steps-1
             trans = self.Transition(state,
                                     action_pol.detach().cpu().numpy(),
-                                    log_prob_a,
+                                    log_prob_a.detach().cpu().numpy(),
                                     value.detach().cpu().numpy(),
                                     next_value.detach().cpu().numpy(),
                                     np.array(reward_repeat),
