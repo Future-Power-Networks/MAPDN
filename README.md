@@ -277,13 +277,16 @@ For building up your own networks, we provide an open-source codebase to produce
 If you would use this environment or part of this work, please cite the following paper.
 
 ```
-@misc{wang2021multiagent,
-      title={Multi-Agent Reinforcement Learning for Active Voltage Control on Power Distribution Networks}, 
-      author={Jianhong Wang and Wangkun Xu and Yunjie Gu and Wenbin Song and Tim C. Green},
-      year={2021},
-      eprint={2110.14300},
-      archivePrefix={arXiv},
-      primaryClass={cs.LG}
+@inproceedings{NEURIPS2021_1a672771,
+ author = {Wang, Jianhong and Xu, Wangkun and Gu, Yunjie and Song, Wenbin and Green, Tim C},
+ booktitle = {Advances in Neural Information Processing Systems},
+ editor = {M. Ranzato and A. Beygelzimer and Y. Dauphin and P.S. Liang and J. Wortman Vaughan},
+ pages = {3271--3284},
+ publisher = {Curran Associates, Inc.},
+ title = {Multi-Agent Reinforcement Learning for Active Voltage Control on Power Distribution Networks},
+ url = {https://proceedings.neurips.cc/paper/2021/file/1a6727711b84fd1efbb87fc565199d13-Paper.pdf},
+ volume = {34},
+ year = {2021}
 }
 ```
 <br />
