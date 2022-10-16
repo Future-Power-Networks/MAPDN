@@ -45,6 +45,9 @@ class VoltageControl(MultiAgentEnv):
         # set the data path
         self.data_path = args.data_path
 
+        # set the random seed
+        np.random.seed(args.seed)
+        
         # load the model of power network
         self.base_powergrid = self._load_network()
         

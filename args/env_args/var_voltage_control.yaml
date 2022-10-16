@@ -18,3 +18,4 @@ env_args:
     "action_bias": null
     "mode": null # distributed / decentralised
     "reset_action": True
+    "seed": 0
