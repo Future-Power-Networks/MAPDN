@@ -17,6 +17,8 @@ class SQDDPG(Model):
             self.reload_params_to_target()
         self.sample_size = self.args.sample_size
         self.batchnorm = nn.BatchNorm1d(self.args.agent_num).to(self.device)
+        self.agent_importance_vec = th.tensor(args.agent_importance_vec, device=self.device) if args.prior_knowledge \
+            else th.tensor(np.ones(self.n_agents)/self.n_agents, device=self.device)
 
     def construct_value_net(self):
         if self.args.agent_id:
