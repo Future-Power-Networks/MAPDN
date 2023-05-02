@@ -5,6 +5,11 @@
     <img src="img/bath.gif" width="125" hspace="10"/>
 </p>
 
+
+| :exclamation:  Warning |
+|:-----------------------------------------|
+|The Link for downloading data was expired, and it has been fixed! We are sorry for the inconvenience incurred.|
+
 # Multi-Agent Reinforcement Learning for Active Voltage Control on Power Distribution Networks (MAPDN)
 
 This is the implementation of the paper [Multi-Agent Reinforcement Learning for Active Voltage Control on Power Distribution Networks](https://arxiv.org/abs/2110.14300).
@@ -88,7 +93,7 @@ where $l_{v}(\cdot)$ is a voltage barrier function that measures whether the vol
 
 ## Downloading the Dataset
 
-1. Download the data from the [link](https://drive.google.com/file/d/1ry0-K5M-YMw7TcQQYeFb7U-pYvdWKm9A/view?usp=sharing).
+1. Download the data from the [link](https://drive.google.com/file/d/1-GGPBSolVjX1HseJVblNY3KoTqfblmLh/view?usp=sharing).
 2. Unzip the zip file and you can see the following 3 folders:
 
     * `case33_3min_final`
@@ -297,7 +302,7 @@ We show the basic settings of all scenarios provided in this repository.
 
 ### Downloading Date
 
-1. Download the data from the [link](https://drive.google.com/file/d/1UOzhcQu-1v5GgW_p-TJewZloV5Di8dPA/view?usp=sharing).
+1. Download the data from the [link](https://drive.google.com/file/d/1-Kv6kT4IefvhWGWNcwJPOW-lWOKmYFVo/view?usp=sharing).
 2. Extract the case files and move them to the directory `[Your own parent path]/MAPDN/traditional_control`.
 
 ### Running
