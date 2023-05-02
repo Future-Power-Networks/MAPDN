@@ -229,8 +229,11 @@ def main():
             for agent_id in range(n_agents):
                 avail_actions = env.get_avail_agent_actions(agent_id)
                 avail_actions_ind = np.nonzero(avail_actions)[0]
-                action = np.random.choice(avail_actions_ind)
+                action = np.random.normal(0, 0.5, n_actions)
+                action = action[avail_actions_ind]
                 actions.append(action)
+
+            actions = np.concatenate(actions, axis=0)
             
             reward, _, info = env.step(actions)
 
