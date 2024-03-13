@@ -260,7 +260,7 @@ class VoltageControl(MultiAgentEnv):
                         # transform the voltage phase to radian
                         obs += list(zone_buses.loc[:, "va_degree"].to_numpy(copy=True) * np.pi / 180)
                     obs_sgen_dict[f"'{list(clusters.keys())[i]}'"] = np.array(obs)
-                obs_len_list.append(obs_sgen_dict[f"'{list(clusters.keys())[i]}'"].shape[0]
+                obs_len_list.append(obs_sgen_dict[f"'{list(clusters.keys())[i]}'"].shape[0])
             agents_obs = list()
             obs_max_len = max(obs_len_list)
             for sgen in sgen_list:
