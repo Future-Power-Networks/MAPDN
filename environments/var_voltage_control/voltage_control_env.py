@@ -229,7 +229,7 @@ class VoltageControl(MultiAgentEnv):
         state = np.array(state)
         return state
     
-    def get_obs(self):# is the function that gets the (partial) observations of agents after step or reset.
+    def get_obs(self):
         """return the obs for each agent in the power system
            the default obs: voltage, active power of generators, bus state, load active power, load reactive power
            each agent can only observe the state within the zone where it belongs
