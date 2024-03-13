@@ -229,22 +229,21 @@ class VoltageControl(MultiAgentEnv):
         state = np.array(state)
         return state
     
-    def get_obs(self):
+    def get_obs(self):# is the function that gets the (partial) observations of agents after step or reset.
         """return the obs for each agent in the power system
            the default obs: voltage, active power of generators, bus state, load active power, load reactive power
            each agent can only observe the state within the zone where it belongs
         """
         clusters = self._get_clusters_info()
-
         if self.args.mode == "distributed":
-            obs_zone_dict = dict()
-            zone_list = list()
+            obs_sgen_dict = dict()
+            sgen_list = list()
             obs_len_list = list()
             for i in range(len(self.powergrid.sgen)):
                 obs = list()
                 zone_buses, zone, pv, q, sgen_bus = clusters[f"sgen{i}"]
-                zone_list.append(zone)
-                if not( zone in obs_zone_dict.keys() ):
+                sgen_list.append(f"'{list(clusters.keys())[i]}'")
+                if not( f"'{list(clusters.keys())[i]}'" in obs_sgen_dict.keys() ):
                     if "demand" in self.state_space:
                         copy_zone_buses = copy.deepcopy(zone_buses)
                         copy_zone_buses.loc[sgen_bus]["p_mw"] += pv
@@ -260,14 +259,14 @@ class VoltageControl(MultiAgentEnv):
                     if "va_degree" in self.state_space:
                         # transform the voltage phase to radian
                         obs += list(zone_buses.loc[:, "va_degree"].to_numpy(copy=True) * np.pi / 180)
-                    obs_zone_dict[zone] = np.array(obs)
-                obs_len_list.append(obs_zone_dict[zone].shape[0])
+                    obs_sgen_dict[f"'{list(clusters.keys())[i]}'"] = np.array(obs)
+                obs_len_list.append(obs_sgen_dict[f"'{list(clusters.keys())[i]}'"].shape[0]
             agents_obs = list()
             obs_max_len = max(obs_len_list)
-            for zone in zone_list:
-                obs_zone = obs_zone_dict[zone]
-                pad_obs_zone = np.concatenate( [obs_zone, np.zeros(obs_max_len - obs_zone.shape[0])], axis=0 )
-                agents_obs.append(pad_obs_zone)
+            for sgen in sgen_list:
+                obs_sgen = obs_sgen_dict[sgen]
+                pad_obs_sgen = np.concatenate( [obs_sgen, np.zeros(obs_max_len - obs_sgen.shape[0])], axis=0 )
+                agents_obs.append(pad_obs_sgen)
         elif self.args.mode == "decentralised":
             obs_len_list = list()
             zone_obs_list = list()
@@ -309,7 +308,6 @@ class VoltageControl(MultiAgentEnv):
                 agents_obs_.append(copy.deepcopy(obs_))
                 self.obs_history[i].append(copy.deepcopy(obs))
             agents_obs = agents_obs_
-
         return agents_obs
 
     def get_obs_agent(self, agent_id):
