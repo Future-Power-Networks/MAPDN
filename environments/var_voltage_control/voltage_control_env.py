@@ -235,6 +235,13 @@ class VoltageControl(MultiAgentEnv):
            each agent can only observe the state within the zone where it belongs
         """
         clusters = self._get_clusters_info()
+        for i in range(len(self.powergrid.sgen)):
+            clusters[f"sgen{i}"][0].loc[clusters[f"sgen{i}"][4]]["p_mw"] += clusters[f"sgen{i}"][2]
+            clusters[f"sgen{i}"][0].loc[clusters[f"sgen{i}"][4]]["q_mvar"] += clusters[f"sgen{i}"][3]
+            for j in range(len(self.powergrid.sgen)):
+                if i != j and clusters[f"sgen{j}"][1] == clusters[f"sgen{i}"][1]:
+                    clusters[f"sgen{j}"][0].loc[clusters[f"sgen{i}"][4]]["p_mw"] += clusters[f"sgen{i}"][2]
+                    clusters[f"sgen{j}"][0].loc[clusters[f"sgen{i}"][4]]["q_mvar"] += clusters[f"sgen{i}"][3]            
         if self.args.mode == "distributed":
             obs_sgen_dict = dict()
             sgen_list = list()
@@ -246,8 +253,6 @@ class VoltageControl(MultiAgentEnv):
                 if not( f"'{list(clusters.keys())[i]}'" in obs_sgen_dict.keys() ):
                     if "demand" in self.state_space:
                         copy_zone_buses = copy.deepcopy(zone_buses)
-                        copy_zone_buses.loc[sgen_bus]["p_mw"] += pv
-                        copy_zone_buses.loc[sgen_bus]["q_mvar"] += q
                         obs += list(copy_zone_buses.loc[:, "p_mw"].to_numpy(copy=True))
                         obs += list(copy_zone_buses.loc[:, "q_mvar"].to_numpy(copy=True))
                     if "pv" in self.state_space:
