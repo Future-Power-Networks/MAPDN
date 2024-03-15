@@ -10,6 +10,10 @@
 |:-----------------------------------------|
 |The Link for downloading data was expired, and it has been fixed! We are sorry for the inconvenience incurred.|
 
+| :warning:  Update |
+|:-----------------------------------------|
+|15/03/24: We fixed a bug in assigning p and q of PV to the nodes equipped with an agent. Thanks to Yang Zhang, a PhD student from Department of Automation, Shanghai Jiao Tong University, who found this bug and assisted us in fixing it.|
+
 # Multi-Agent Reinforcement Learning for Active Voltage Control on Power Distribution Networks (MAPDN)
 
 This is the implementation of the paper [Multi-Agent Reinforcement Learning for Active Voltage Control on Power Distribution Networks](https://arxiv.org/abs/2110.14300).
