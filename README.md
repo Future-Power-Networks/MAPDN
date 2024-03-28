@@ -309,7 +309,7 @@ We show the basic settings of all scenarios provided in this repository.
 
 ### Downloading Date
 
-1. Download the data from the [link](https://drive.google.com/file/d/1-Kv6kT4IefvhWGWNcwJPOW-lWOKmYFVo/view?usp=sharing).
+1. Download the data from the [LINK](https://drive.google.com/file/d/1-Kv6kT4IefvhWGWNcwJPOW-lWOKmYFVo/view?usp=sharing).
 2. Extract the case files and move them to the directory `[Your own parent path]/MAPDN/traditional_control`.
 
 ### Running
