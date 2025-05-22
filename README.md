@@ -359,5 +359,5 @@ If you would use this environment or part of this work, please cite the followin
 
 ## Contact
 
-If you have any issues or any intention of cooperation, please feel free to contact me via `jianhong.wang16@imperial.ac.uk`.
+If you have any issues or any intention of cooperation, please feel free to contact me via `jianhong.wang@bristol.ac.uk`.
 
