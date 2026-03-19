@@ -1,0 +1,21 @@
+alg: "maac_masked"
+alg_args:
+  "policy_lrate": 1.0e-4
+  "value_lrate": 1.0e-4
+  "attend_heads": 1
+  "norm_in": False
+  "soft": True
+  "reward_scale": 100
+  "gaussian_policy": True
+  "action_enforcebound": True
+  "graph_dir": null
+  "graph_mask_path": null
+  "edge_prior_path": null
+  "attention_mode": "mask_prior"
+  "edge_prior_scale": 1.0
+  "prior_bias_mode": "add"
+  "prior_bias_eps": 1.0e-6
+  "mask_fill_value": -1000000000.0
+  "full_attention_fallback": True
+  "symmetrize_mask": False
+  "symmetrize_prior": False

@@ -8,6 +8,7 @@ from .matd3 import MATD3
 from .ippo import IPPO
 from .mappo import MAPPO
 from .facmaddpg import FACMADDPG
+from .maac_masked import MaskedMAAC
 
 
 
@@ -17,6 +18,7 @@ Model = dict(maddpg=MADDPG,
              iddpg=IDDPG,
              coma=COMA,
              maac=MAAC,
+             maac_masked=MaskedMAAC,
              matd3=MATD3,
              ippo=IPPO,
              mappo=MAPPO,
@@ -29,6 +31,7 @@ Strategy = dict(maddpg='pg',
                 iddpg='pg',
                 coma='pg',
                 maac='pg',
+                maac_masked='pg',
                 matd3='pg',
                 ippo='pg',
                 mappo='pg',

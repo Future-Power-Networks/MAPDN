@@ -8,6 +8,8 @@ import os
 from collections import namedtuple
 from .pf_res_plot import pf_res_plotly
 from .voltage_barrier.voltage_barrier_backend import VoltageBarrier
+import pickle
+from pandapower.convert_format import convert_format
 
 
 
@@ -401,10 +403,23 @@ class VoltageControl(MultiAgentEnv):
         return np.random.choice(pv_days - episode_days)
 
     def _load_network(self):
-        """load network
-        """
         network_path = os.path.join(self.data_path, 'model.p')
-        base_net = pp.from_pickle(network_path)
+        try:
+            base_net = pp.from_pickle(network_path)
+        except KeyError as e:
+            if str(e) != "'type'":
+                raise
+
+            with open(network_path, "rb") as f:
+                base_net = pickle.load(f)
+
+            if "type" not in base_net.sgen.columns:
+                base_net.sgen["type"] = None
+            if "current_source" not in base_net.sgen.columns:
+                base_net.sgen["current_source"] = True
+
+            convert_format(base_net)
+
         return self._create_basenet(base_net)
 
     def _load_pv_data(self):

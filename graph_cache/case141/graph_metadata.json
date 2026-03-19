@@ -1,0 +1,52 @@
+{
+  "scenario": "case33_3min_final",
+  "mode": "distributed",
+  "metric": "bus_voltage",
+  "num_agents": 6,
+  "agent_zones": [
+    "zone1",
+    "zone1",
+    "zone2",
+    "zone3",
+    "zone4",
+    "zone4"
+  ],
+  "num_requested_samples": 400,
+  "num_valid_samples": 400,
+  "num_failed_samples": 0,
+  "delta_q_ratio": 0.05,
+  "min_delta_q": 0.001,
+  "threshold_quantile": 0.75,
+  "top_k": 3,
+  "prior_stat": "p75",
+  "symmetrize": false,
+  "graph_density": 0.6000000238418579,
+  "v_lower": 0.95,
+  "v_upper": 1.05,
+  "env_config": {
+    "voltage_barrier_type": "l1",
+    "voltage_weight": 1.0,
+    "q_weight": 0.1,
+    "line_weight": null,
+    "dq_dv_weight": null,
+    "history": 1,
+    "pv_scale": 1.0,
+    "demand_scale": 1.0,
+    "state_space": [
+      "pv",
+      "demand",
+      "reactive",
+      "vm_pu",
+      "va_degree"
+    ],
+    "v_upper": 1.05,
+    "v_lower": 0.95,
+    "data_path": "./environments/var_voltage_control/data/case33_3min_final",
+    "episode_limit": 240,
+    "action_scale": 0.8,
+    "action_bias": 0.0,
+    "mode": "distributed",
+    "reset_action": true,
+    "seed": 0
+  }
+}
