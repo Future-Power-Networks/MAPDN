@@ -27,6 +27,25 @@ The environment implementation follows the multi-agent environment framework pro
 
 <br />
 
+## Table of Contents
+
+1. [Summary of the Repository](#summary-of-the-repository)
+2. [A Brief Introduction of the Task](#a-brief-introduction-of-the-task)
+3. [Installation of the Dependencies](#installation-of-the-dependencies)
+4. [Downloading the Dataset](#downloading-the-dataset)
+5. [Two modes of Tasks](#two-modes-of-tasks)
+6. [Quick Start](#quick-start)
+7. [Interaction with Environment](#interaction-with-environment)
+8. [Reproduce the Results in the Paper](#reproduce-the-results-in-the-paper)
+9. [Brief Introduction of Scenarios](#brief-introduction-of-scenarios)
+10. [Traditional Control](#traditional-control)
+11. [API Usage](#api-usage)
+12. [Build Up Your Own Power Networks](#build-up-your-own-power-networks)
+13. [Citation](#citation)
+14. [Contact](#contact)
+
+<br />
+
 ## Summary of the Repository
 
 This repository includes the following components.
@@ -182,6 +201,40 @@ The the meanings of the arguments are illustrated as follows:
 * `--test-mode` is the test mode you would like to use. There are 2 modes you can use, i.e. `single` and `batch`. 
 * `--test-day` is the day that you would like to do the test. Note that it is only activated if the `--test-mode` is `single`.
 * `--render` indicates activating the rendering of the environment.
+
+### Expected Output Files
+
+After training with:
+
+```
+python train.py --alg matd3 --alias 0 --mode distributed --scenario case33_3min_final --voltage-barrier-type l1 --save-path trial
+```
+
+the model checkpoint should be saved at:
+
+```
+trial/model_save/var_voltage_control-case33_3min_final-distributed-matd3-l1-0/model.pt
+```
+
+and test should load from the same directory by using:
+
+```
+python test.py --save-path trial --alg matd3 --alias 0 --mode distributed --scenario case33_3min_final --voltage-barrier-type l1 --test-mode single --test-day 730
+```
+
+### Quick Verification
+
+Before running train/test, confirm dataset folders exist:
+
+```bash
+ls environments/var_voltage_control/data
+```
+
+Expected folders:
+
+* `case33_3min_final`
+* `case141_3min_final`
+* `case322_3min_final`
 
 <br />
 
@@ -341,6 +394,7 @@ For more details of this environment, users can check the [API Docs](https://git
 <br />
 
 ## Build Up Your Own Power Networks
+MAPDN focuses on training/evaluation; scenario generation lives separately by design.
 
 For building up your own networks, we provide an open-source codebase to produce the above scenarios in this [Repository](https://github.com/xuwkk/gen_pandapower_pv).
 
@@ -368,4 +422,3 @@ If you would use this environment or part of this work, please cite the followin
 ## Contact
 
 If you have any issues or any intention of cooperation, please feel free to contact me via `jianhong.wang@bristol.ac.uk`.
-
