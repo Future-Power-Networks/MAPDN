@@ -1,11 +1,12 @@
 import torch
+import os
 import argparse
 import yaml
 import pickle
 
 from models.model_registry import Model, Strategy
 from environments.var_voltage_control.voltage_control_env import VoltageControl
-from utilities.util import convert
+from utilities.util import convert, setup_voltage_control_scenario
 from utilities.tester import PGTester
 
 
@@ -16,7 +17,7 @@ parser.add_argument("--alg", type=str, nargs="?", default="maddpg", help="Please
 parser.add_argument("--env", type=str, nargs="?", default="var_voltage_control", help="Please enter the env name.")
 parser.add_argument("--alias", type=str, nargs="?", default="", help="Please enter the alias for exp control.")
 parser.add_argument("--mode", type=str, nargs="?", default="distributed", help="Please enter the mode: distributed or decentralised.")
-parser.add_argument("--scenario", type=str, nargs="?", default="bus33_3min_final", help="Please input the valid name of an environment scenario.")
+parser.add_argument("--scenario", type=str, nargs="?", default="case33_3min_final", help="Please input the valid name of an environment scenario.")
 parser.add_argument("--voltage-barrier-type", type=str, nargs="?", default="l1", help="Please input the valid voltage barrier type: l1, courant_beltrami, l2, bowl or bump.")
 parser.add_argument("--test-mode", type=str, nargs="?", default="single", help="Please input the valid test mode: single or batch.")
 parser.add_argument("--test-day", type=int, nargs="?", default=730, help="Please input the day you would test if the test mode is single.")
@@ -26,22 +27,9 @@ argv = parser.parse_args()
 # load env args
 with open("./args/env_args/"+argv.env+".yaml", "r") as f:
     env_config_dict = yaml.safe_load(f)["env_args"]
-data_path = env_config_dict["data_path"].split("/")
-data_path[-1] = argv.scenario
-env_config_dict["data_path"] = "/".join(data_path)
 net_topology = argv.scenario
 
-# set the action range
-assert net_topology in ['case33_3min_final', 'case141_3min_final', 'case322_3min_final'], f'{net_topology} is not a valid scenario.'
-if argv.scenario == 'case33_3min_final':
-    env_config_dict["action_bias"] = 0.0
-    env_config_dict["action_scale"] = 0.8
-elif argv.scenario == 'case141_3min_final':
-    env_config_dict["action_bias"] = 0.0
-    env_config_dict["action_scale"] = 0.6
-elif argv.scenario == 'case322_3min_final':
-    env_config_dict["action_bias"] = 0.0
-    env_config_dict["action_scale"] = 0.8
+setup_voltage_control_scenario(env_config_dict, net_topology)
 
 assert argv.mode in ['distributed', 'decentralised'], "Please input the correct mode, e.g. distributed or decentralised."
 env_config_dict["mode"] = argv.mode
@@ -74,12 +62,14 @@ alg_config_dict["cuda"] = False
 args = convert(alg_config_dict)
 
 # define the save path
-if argv.save_path[-1] == "/":
-    save_path = argv.save_path
-else:
-    save_path = argv.save_path+"/"
+save_path = os.path.normpath(argv.save_path)
 
-LOAD_PATH = save_path+log_name+"/model.pt"
+LOAD_PATH = os.path.join(save_path, "model_save", log_name, "model.pt")
+if not os.path.isfile(LOAD_PATH):
+    raise FileNotFoundError(
+        f"Checkpoint not found: {LOAD_PATH}\n"
+        "Please ensure training has completed and that --save-path/--alg/--alias/--mode/--scenario/--voltage-barrier-type match the training run."
+    )
 
 model = Model[argv.alg]
 

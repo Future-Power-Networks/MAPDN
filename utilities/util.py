@@ -198,3 +198,19 @@ def dict2str(dict, dict_name):
         string.append(f'\t{k}: {v}' )
     string = "\n".join(string)
     return string
+
+def setup_voltage_control_scenario(env_config_dict, scenario):
+    data_path = env_config_dict["data_path"].split("/")
+    data_path[-1] = scenario
+    env_config_dict["data_path"] = "/".join(data_path)
+
+    assert scenario in ['case33_3min_final', 'case141_3min_final', 'case322_3min_final'], f'{scenario} is not a valid scenario.'
+    if scenario == 'case33_3min_final':
+        env_config_dict["action_bias"] = 0.0
+        env_config_dict["action_scale"] = 0.8
+    elif scenario == 'case141_3min_final':
+        env_config_dict["action_bias"] = 0.0
+        env_config_dict["action_scale"] = 0.6
+    elif scenario == 'case322_3min_final':
+        env_config_dict["action_bias"] = 0.0
+        env_config_dict["action_scale"] = 0.8
